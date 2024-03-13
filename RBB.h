@@ -1,19 +1,23 @@
 #include<bits/stdc++.h>
+enum RobotAction{GET, PULL};
+enum RobotStatus{NotReady, ReadyToGo, GoingToGood, ReturnToBerth};
+enum RobotMove{RIGHT, LEFT, UP, DOWN, STAND};
 
 class Robot
 {
 public:
-    int x, y, goods;
-    int status;
-    int mbx, mby;
+    int x, y, gx, gy, goods;
+    RobotStatus status;     // -1=not ready; 0=idle; 1=going to goods; 2=return to berth
+    int sys_status; // 0=restore, 1=normal;
     int berth_id;
+    RobotAction action_before_move; // 0=nothing, 1=get, 2=pull
+    RobotMove action_move;    // 0=right, 1=left, 2=up, 3=down
+    RobotAction action_after_move;  // 0=nothing, 1=get, 2=pull
     Robot() {
         x = 0;
         y = 0;
         goods = 0;
-        status = 0;
-        mbx = 0;
-        mby = 0;
+        status = NotReady;
         berth_id = -1;
     }
     Robot(int startX, int startY) {
