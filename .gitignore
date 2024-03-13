@@ -2,3 +2,5 @@ build
 LinuxRelease
 doc
 .vscode
+.vs
+out
