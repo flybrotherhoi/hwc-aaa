@@ -9,7 +9,7 @@ int dy[4]={1,-1,0,0};
 const int time_between_berth=500;
 // in the map, '.' means empty, 'A' means robot, 'B' means berth(4x4),
 // '#' means obstacle, '*' means ocean (same as obstacle which robot cannot pass through)
-const int see_log=1;
+const int see_log=0;
 const int WAIT_TIME=50;
 const int MY_DEBUG=0;
 
@@ -149,8 +149,6 @@ public:
                 for(int k=0;k<4;k++){
                     int nx=x+dx[k];
                     int ny=y+dy[k];
-                    // cout<<x<<' '<< y <<' '<< nx<<' '<<ny << ' ' <<map[nx][ny]<<endl;
-                    // cout<<(nx>=0 && nx<n && ny>=0 && ny<n) << (map[nx][ny]==1) << (shortest_dist_to_berth[i][nx][ny]>shortest_dist_to_berth[i][x][y]+1)<<endl;
                     if(nx>=0 && nx<n && ny>=0 && ny<n && map[nx][ny]==1 && shortest_dist_to_berth[i][nx][ny]>shortest_dist_to_berth[i][x][y]+1){
                         shortest_dist_to_berth[i][nx][ny]=shortest_dist_to_berth[i][x][y]+1;
                         q.push({nx,ny});
@@ -185,7 +183,7 @@ public:
                 ofstream out("../LinuxRelease/log/berth"+to_string(i)+"_dist.txt");
                 for(int j=0;j<n;j++){
                     for(int k=0;k<n;k++){
-                        out<<setw(5)<<shortest_dist_to_berth[i][j][k];
+                        out<<setw(7)<<shortest_dist_to_berth[i][j][k];
                     }
                     out<<endl;
                 }
@@ -268,6 +266,7 @@ public:
         if(MY_DEBUG)cerr<<"robot assigned to berth"<<endl;
 
         // plan the path for each robot
+        vector<pair<int,int>> vec_robot_path[10]; // 为了检测冲突好遍历用的数组
         for(int i=0;i<robot_num;i++){
             if(MY_DEBUG)cerr<<"finding the path for robot "<<i<<endl;
             int x=robot[i].x;
@@ -283,20 +282,86 @@ public:
                 // exit(0);
             }
             robot_path_len[i]=dist;
+            int lastx=x;
+            int lasty=y;
             while(x!=bx||y!=by){
+                int no_way=0;
                 for(int k=0;k<4;k++){
                     int nx=x+dx[k];
                     int ny=y+dy[k];
-                    if(nx>=0&&nx<n&&ny>=0&&ny<n&&shortest_dist_to_berth[id][nx][ny]<dist){
+                    int flag=0; // 不能走到别人的泊位点上
+                    for(int ii=0;ii<10;ii++){
+                        if(nx==berth[ii].x && ny==berth[ii].y & ii!=robot[i].berth_id){
+                            flag=1;
+                            // if(MY_DEBUG)cerr<<"robot "<<i<<" get on the berth "<<ii<<endl;
+                        }
+                    }
+                    // if(MY_DEBUG)cerr<<shortest_dist_to_berth[id][nx][ny]<<"  "<< dist << "  " << (nx>=0 && nx<n && ny>=0 && ny<n) << (nx!=lastx && ny!=lasty)<<endl;
+                    if(nx>=0 && nx<n && ny>=0 && ny<n &&shortest_dist_to_berth[id][nx][ny]<dist && flag==0 && (nx!=lastx || ny!=lasty)){
+                        // if(MY_DEBUG)cerr<<"new step"<<endl;
                         robot_path[i].push_back(k);
+                        vec_robot_path[i].push_back(make_pair(x,y));
+                        lastx=x;
+                        lasty=y;
                         x=nx;
                         y=ny;
                         dist--;
                         break;
                     }
+                    if(k==3){
+                        if(MY_DEBUG)cerr<<"no way to berth "<<id<<", robot "<<i<<endl;
+                        int move = ReverseRobotMove(static_cast<RobotMove>(robot_path[i].back()));
+                        robot_path[i].push_back(move);
+                        lastx=x;
+                        lasty=y;
+                        x=x+dx[move];
+                        y=y+dy[move];
+                        vec_robot_path[i].push_back(make_pair(x,y));
+                        dist++;
+                    }
                 }
             }
         }
+
+        //robot path conflicts detection
+        for(int i=0;i<10;i++){
+            robot[i].start_delay=0;
+            int conflict_flag=0;
+            if(MY_DEBUG)cerr<<"conflict flag: "<<conflict_flag<<endl;
+            for(int j=0;j<i;j++){
+                int t=0;
+                while(t+robot[j].start_delay<vec_robot_path[i].size()&&t<vec_robot_path[j].size()&&vec_robot_path[i][t+robot[j].start_delay]!=vec_robot_path[j][t]){
+                    t++;
+                }
+                if(t+robot[j].start_delay<vec_robot_path[i].size()&&t<vec_robot_path[j].size()){
+                    conflict_flag=1;
+                }
+            }
+            if(MY_DEBUG)cerr<<"conflict flag: "<<conflict_flag<<endl;
+            if(conflict_flag==1){
+                int start_delay = 1;
+                while(1){
+                    int conflict_flag=0;
+                    for(int j=0;j<i;j++){
+                        int jsd = robot[j].start_delay;
+                        int t=0;
+                        while(t+jsd<vec_robot_path[i].size() && t<vec_robot_path[j].size() - start_delay&& vec_robot_path[i][t]!=vec_robot_path[j][t+start_delay]){
+                            t++;
+                        }
+                        if(t<vec_robot_path[i].size()&&t<vec_robot_path[j].size()){
+                            conflict_flag=1;
+                        }
+                    }
+                    if(conflict_flag==0){
+                        robot[i].start_delay=start_delay;
+                        break;
+                    }
+                    start_delay++;
+                    if(MY_DEBUG)cerr<<"start delay: "<<start_delay<<endl;
+                }
+            }
+        }
+
         if(MY_DEBUG)cerr<<"init done"<<endl;
         if(see_log){
             ofstream out("../LinuxRelease/log/berth_goods.txt");
@@ -335,8 +400,21 @@ public:
     }
 
     void Process(){
+        int robot_not_ready=0;
+        for(int i=0;i<robot_num;i++){
+            robot_not_ready += robot[i].status==RobotStatus::NotReady;
+        }
+        if(MY_DEBUG)cerr<<"robot not ready: "<<robot_not_ready<<endl;
         for(int i=0;i<robot_num;i++){
             if(MY_DEBUG)cerr<<"robot "<<i<<" status: "<<robot[i].status<<endl;
+            if(robot[i].start_delay>0){
+                robot[i].status=NotReady;
+                robot[i].action_before_move=RA_NOTHING;
+                robot[i].action_move=STAND;
+                robot[i].action_after_move=RA_NOTHING;
+                robot[i].start_delay--;
+                continue;
+            }
             if(robot[i].sys_status==0){
                 if(robot[i].action_move!=RobotMove::STAND)robot_path[i].push_front(robot[i].action_move); // 先加上恢复状态保证程序不崩溃
                 robot[i].status=NotReady;
@@ -354,6 +432,7 @@ public:
             if (robot[i].status==ReturnToBerth || robot[i].status==ReadyToGo || robot[i].status==NotReady){
                 if(x==berth[berth_id].x && y==berth[berth_id].y){
                     robot[i].status=ReadyToGo;
+                    if(robot_not_ready>0)continue;
                     if(robot[i].goods==1){
                         robot[i].action_before_move=PULL;
                         berth[berth_id].goods++;
@@ -401,11 +480,13 @@ public:
                     else robot[i].action_move=STAND;
                 }
                 else{
-                    robot[i].action_move=static_cast<RobotMove>(robot_path[i].front());
-                    robot_path[i].pop_front();
+                    if(robot_path[i].size()!=0){
+                        robot[i].action_move=static_cast<RobotMove>(robot_path[i].front());
+                        robot_path[i].pop_front();
+                    }
                 }
             }
-            else if (robot[i].status==GoingToGood){
+            else if (robot[i].status==GoingToGood && robot_not_ready==0){
                 if(x==robot[i].gx && y==robot[i].gy){
                     robot[i].status=ReturnToBerth;
                     if(robot[i].goods==0){
