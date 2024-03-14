@@ -363,7 +363,7 @@ public:
                         }
                     }
                     if(dist!=MAX_DIST){
-                        cerr<<"robot "<<i<<"going to goods: "<<robot[i].gx<<' '<<robot[i].gy<<", dist= "<<dist<<endl;
+                        cerr<<"robot "<<i<<" going to goods: "<<robot[i].gx<<' '<<robot[i].gy<<", dist= "<<dist<<endl;
                         robot_path[i].clear();
                         robot[i].status=GoingToGood;
                         // plan the path for each robot
@@ -448,6 +448,12 @@ public:
         }
         for(int i=0;i<5;i++){
             boat[i].action = BA_NOTHING;
+            if(boat[i].berth_id!=-1 && (15000-fid)<= berth[boat[i].berth_id].transport_time+20){
+                boat[i].status = 1;
+                boat[i].action = GO;
+                boat[i].berth_id = -1;
+                continue;
+            }
             if(boat[i].status==-1){
                 boat[i].status = 0;
                 boat[i].action = SHIP;
@@ -459,14 +465,15 @@ public:
                     boat[i].goods = 0;
                 }
                 else if(boat[i].berth_id%2==0){ // 还在第一个泊位
-                    if(berth[boat[i].berth_id].goods==0 || berth[boat[i].berth_id+1].goods>boat_capacity-boat[i].goods || boat[i].goods>=boat_capacity*0.3){
+                    if(berth[boat[i].berth_id].goods==0 || berth[boat[i].berth_id+1].goods>boat_capacity-boat[i].goods || boat[i].goods>=boat_capacity*0.2){
                         boat[i].action = SHIP;
                         boat[i].berth_id++;
                     }
                 }
                 else if(boat[i].berth_id%2==1){ // 在第二个泊位
                     if(berth[boat[i].berth_id].goods==0 || boat[i].goods>=boat_capacity*0.8){
-                        boat[i].action = SHIP;
+                        cerr<<"boat "<<i<<" go"<<endl;
+                        boat[i].action = GO;
                         boat[i].berth_id=-1;
                     }
                 }
@@ -476,12 +483,10 @@ public:
         for(int i=0;i<berth_num;i++){
             int boat_id = berth[i].boat_id;
             if(boat_id!=-1){
-                if(boat[boat_id].goods<boat_capacity){
-                    if(berth[i].goods>0){
-                        int load_num = min(berth[i].loading_speed, min(boat_capacity-boat[boat_id].goods, berth[i].goods));
-                        berth[i].goods-=load_num;
-                        boat[boat_id].goods+=load_num;
-                    }
+                if(boat[boat_id].goods<boat_capacity & berth[i].goods>0){
+                    int load_num = min(berth[i].loading_speed, min(boat_capacity-boat[boat_id].goods, berth[i].goods));
+                    berth[i].goods-=load_num;
+                    boat[boat_id].goods+=load_num;
                 }
             }
         }
@@ -499,6 +504,7 @@ public:
                 printf("move %d %d\n", i, robot[i].action_move);
         }
         for(int i=0;i<5;i++){
+            cerr<<"boat "<<i<<" action: "<<boat[i].action<<' '<<boat[i].berth_id<<endl;
             if(boat[i].action==SHIP){
                 printf("ship %d %d\n", i, boat[i].berth_id);
             }
