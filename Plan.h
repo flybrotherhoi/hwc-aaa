@@ -327,38 +327,59 @@ public:
         for(int i=0;i<10;i++){
             robot[i].start_delay=0;
             int conflict_flag=0;
-            if(MY_DEBUG)cerr<<"conflict flag: "<<conflict_flag<<endl;
+            vector<int> conflict_id;
             for(int j=0;j<i;j++){
                 int t=0;
-                while(t+robot[j].start_delay<vec_robot_path[i].size()&&t<vec_robot_path[j].size()&&vec_robot_path[i][t+robot[j].start_delay]!=vec_robot_path[j][t]){
+                while(t+robot[j].start_delay+1<vec_robot_path[i].size()&&t<vec_robot_path[j].size()&&
+                    diff_pair(vec_robot_path[i][t+robot[j].start_delay],vec_robot_path[j][t]) &&
+                    diff_pair(vec_robot_path[i][t+robot[j].start_delay+1],vec_robot_path[j][t]) ){
                     t++;
                 }
-                if(t+robot[j].start_delay<vec_robot_path[i].size()&&t<vec_robot_path[j].size()){
+                if(t+robot[j].start_delay<vec_robot_path[i].size()-1&&t<vec_robot_path[j].size()){
                     conflict_flag=1;
+                    conflict_id.push_back(j);
                 }
             }
             if(MY_DEBUG)cerr<<"conflict flag: "<<conflict_flag<<endl;
             if(conflict_flag==1){
-                int start_delay = 1;
-                while(1){
-                    int conflict_flag=0;
-                    for(int j=0;j<i;j++){
-                        int jsd = robot[j].start_delay;
-                        int t=0;
-                        while(t+jsd<vec_robot_path[i].size() && t<vec_robot_path[j].size() - start_delay&& vec_robot_path[i][t]!=vec_robot_path[j][t+start_delay]){
-                            t++;
-                        }
-                        if(t<vec_robot_path[i].size()&&t<vec_robot_path[j].size()){
-                            conflict_flag=1;
-                        }
+                // int start_delay = 1;
+                // while(1){
+                //     int conflict_flag=0;
+                //     for(int j=0;j<i;j++){
+                //         int jsd = robot[j].start_delay;
+                //         int t=0;
+                //         while(t+jsd-start_delay+1<vec_robot_path[i].size()-start_delay && t<vec_robot_path[j].size()
+                //          && diff_pair(vec_robot_path[i][t+jsd-start_delay], vec_robot_path[j][t]) 
+                //          && diff_pair(vec_robot_path[i][t+jsd-start_delay+1], vec_robot_path[j][t])){
+                //             t++;
+                //         }
+                //         if(t+jsd-start_delay+1<vec_robot_path[i].size()-start_delay&&t<vec_robot_path[j].size()){
+                //             conflict_flag=1;
+                //         }
+                //         // if(t<vec_robot_path[i].size()&&t<vec_robot_path[j].size()){
+                //         //     conflict_flag=1;
+                //         // }
+                //     }
+                //     if(conflict_flag==0){
+                //         robot[i].start_delay=start_delay;
+                //         break;
+                //     }
+                //     start_delay++;
+                    // if(MY_DEBUG)cerr<<"start delay: "<<start_delay<<endl;
+                
+                //}
+                int start_delay=MAX_DIST;
+                for(int k=0;k<conflict_id.size();k++){
+                    if(start_delay>(robot[conflict_id[k]].start_delay+vec_robot_path[conflict_id[k]].size())){
+                        start_delay=robot[conflict_id[k]].start_delay+vec_robot_path[conflict_id[k]].size();
                     }
-                    if(conflict_flag==0){
-                        robot[i].start_delay=start_delay;
-                        break;
-                    }
-                    start_delay++;
-                    if(MY_DEBUG)cerr<<"start delay: "<<start_delay<<endl;
                 }
+                robot[i].start_delay=start_delay;
+            }
+        }
+        if(MY_DEBUG){
+            for(int i=0;i<10;i++){
+                cerr<<"robot "<<i<<" start delay: "<<robot[i].start_delay<<endl;
             }
         }
 
