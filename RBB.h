@@ -70,6 +70,7 @@ public:
     int status;
     int goods;
     int berth_id;
+    int timer_wait;
     BoatAction action;
     Boat() {
         num = 0;

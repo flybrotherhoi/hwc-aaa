@@ -10,6 +10,8 @@ const int time_between_berth=500;
 // in the map, '.' means empty, 'A' means robot, 'B' means berth(4x4),
 // '#' means obstacle, '*' means ocean (same as obstacle which robot cannot pass through)
 const int see_log=1;
+const int WAIT_TIME=50;
+const int MY_DEBUG=0;
 
 using namespace std;
 class Plan
@@ -21,8 +23,6 @@ public:
     Berth berth[berth_num];
     deque<short> robot_path[robot_num];
     short robot_path_len[robot_num];
-    vector<pair<int,int>> gds_pos;
-    vector<pair<int,int>> gds_time_val;
     vector<pair<int,int>> berth_region[10];
     Boat boat[10];
     char ch[210][210];
@@ -46,7 +46,7 @@ public:
         scanf("%d", &boat_capacity);
         char okk[100];
         scanf("%s", okk);
-        cerr<<"init start"<<endl;
+        if(MY_DEBUG)cerr<<"init start"<<endl;
         // get the position of robots
         int tid=0;
         for(int i = 0; i < n; i ++)
@@ -75,6 +75,7 @@ public:
             boat[i].num = 0;
             boat[i].goods = 0;
             boat[i].berth_id = -1;
+            boat[i].timer_wait = WAIT_TIME;
         }
 
         if(see_log){
@@ -99,7 +100,7 @@ public:
                     map[i][j] = 1;
             }
 
-        cerr<<"map init done"<<endl;
+        if(MY_DEBUG)cerr<<"map init done"<<endl;
         if(see_log){
             ofstream out("../LinuxRelease/log/map.txt");
             for(int i=0;i<n;i++){
@@ -138,7 +139,7 @@ public:
 
         // 用广度优先搜索计算每个泊位到每个点的最短距离
         for(int i=0;i<berth_num;i++){
-            cerr<<"finding the shortest distance to berth "<<i<<endl;
+            if(MY_DEBUG)cerr<<"finding the shortest distance to berth "<<i<<endl;
             std::queue<std::pair<int,int>> q;
             q.push({berth[i].x,berth[i].y});
             shortest_dist_to_berth[i][berth[i].x][berth[i].y]=0;
@@ -157,7 +158,7 @@ public:
                 }
             }
         }
-        cerr<<"shortest distance to berth done"<<endl;
+        if(MY_DEBUG)cerr<<"shortest distance to berth done"<<endl;
         // 分配parts,给map上所有为1的点分配一个距离最近的泊位
         int parts_num[10]={0};
         for(int i=0;i<n;i++){
@@ -178,7 +179,7 @@ public:
                 }
             }
         }
-        cerr<<"parts assigned"<<endl;
+        if(MY_DEBUG)cerr<<"parts assigned"<<endl;
         if(see_log){
             for(int i=0;i<berth_num;i++){
                 ofstream out("../LinuxRelease/log/berth"+to_string(i)+"_dist.txt");
@@ -205,7 +206,7 @@ public:
         // for(int i=0;i<n;i++){
         //     memcpy(parts_check[i],parts[i],sizeof(short)*n);
         // }
-        // cerr<<"parts check start"<<endl;
+        // if(MY_DEBUG)cerr<<"parts check start"<<endl;
         // 检查每个区域的连通性
         // for(int i=0;i<berth_num;i++){
         //     std::queue<std::pair<int,int>> q;
@@ -233,7 +234,7 @@ public:
         //     }
         // }
         
-        cerr<<"parts check done"<<endl;
+        if(MY_DEBUG)cerr<<"parts check done"<<endl;
 
         for(int i=0;i<n;i++){
             for(int j=0;j<n;j++){
@@ -242,7 +243,7 @@ public:
                 }
             }
         }
-        cerr<<"berth region assigned"<<endl;
+        if(MY_DEBUG)cerr<<"berth region assigned"<<endl;
 
         // assign robot to berth
         int flag[10];
@@ -264,11 +265,11 @@ public:
                 }
             }
         }
-        cerr<<"robot assigned to berth"<<endl;
+        if(MY_DEBUG)cerr<<"robot assigned to berth"<<endl;
 
         // plan the path for each robot
         for(int i=0;i<robot_num;i++){
-            cerr<<"finding the path for robot "<<i<<endl;
+            if(MY_DEBUG)cerr<<"finding the path for robot "<<i<<endl;
             int x=robot[i].x;
             int y=robot[i].y;
             int id=robot[i].berth_id;
@@ -278,7 +279,7 @@ public:
             robot[i].status=NotReady;
             robot[i].sys_status=1;
             if(dist==MAX_DIST){
-                cerr<< "robot" <<i<<" cannot reach berth "<<id<<", robot coordinates: "<<x<<" "<<y<<endl;
+                if(MY_DEBUG)cerr<< "robot" <<i<<" cannot reach berth "<<id<<", robot coordinates: "<<x<<" "<<y<<endl;
                 // exit(0);
             }
             robot_path_len[i]=dist;
@@ -296,7 +297,15 @@ public:
                 }
             }
         }
-        cerr<<"init done"<<endl;
+        if(MY_DEBUG)cerr<<"init done"<<endl;
+        if(see_log){
+            ofstream out("../LinuxRelease/log/berth_goods.txt");
+            out<<"init   ";
+            for(int i=0;i<berth_num;i++){
+                out<<berth[i].goods<<'\t';
+            }
+            out<<endl;
+        }
 
         printf("OK\n");
         fflush(stdout);
@@ -326,14 +335,10 @@ public:
     }
 
     void Process(){
-        // update gds
-        // for(int i=0;i<gds_pos.size();i++){
-        //     if(gds[])
-        // }
         for(int i=0;i<robot_num;i++){
-            cerr<<"robot "<<i<<" status: "<<robot[i].status<<endl;
+            if(MY_DEBUG)cerr<<"robot "<<i<<" status: "<<robot[i].status<<endl;
             if(robot[i].sys_status==0){
-                if(robot[i].action_move!=RA_NOTHING)robot_path[i].push_front(robot[i].action_move); // 先加上恢复状态保证程序不崩溃
+                if(robot[i].action_move!=RobotMove::STAND)robot_path[i].push_front(robot[i].action_move); // 先加上恢复状态保证程序不崩溃
                 robot[i].status=NotReady;
                 robot[i].action_before_move=RA_NOTHING;
                 robot[i].action_move=STAND;
@@ -353,21 +358,24 @@ public:
                         robot[i].action_before_move=PULL;
                         berth[berth_id].goods++;
                     }
-                    cerr<<"planing the path for robot "<<i<<endl;
+                    if(MY_DEBUG)cerr<<"planing the path for robot "<<i<<endl;
                     // plan the path to the nearest goods
                     int dist=MAX_DIST;
-                    
+                    float vvt = 0;
                     for(int t=0;t<berth_region[berth_id].size();t++){
                         int x=berth_region[berth_id][t].first;
                         int y=berth_region[berth_id][t].second;
-                        if(gds[x][y]>0 && gds_time[x][y]+1000>fid+shortest_dist_to_berth[berth_id][x][y] && shortest_dist_to_berth[berth_id][x][y]<dist){
+                        float nvvt;
+                        nvvt = 5.0*gds[x][y]/(1.0*shortest_dist_to_berth[berth_id][x][y]);
+                        if(gds[x][y]>0 && gds_time[x][y]+1000>fid+shortest_dist_to_berth[berth_id][x][y] && nvvt>vvt){
                             robot[i].gx=x;
                             robot[i].gy=y;
                             dist = shortest_dist_to_berth[berth_id][x][y];
+                            vvt = nvvt;
                         }
                     }
                     if(dist!=MAX_DIST){
-                        cerr<<"robot "<<i<<" going to goods: "<<robot[i].gx<<' '<<robot[i].gy<<", dist= "<<dist<<endl;
+                        if(MY_DEBUG)cerr<<"robot "<<i<<" going to goods: "<<robot[i].gx<<' '<<robot[i].gy<<", dist= "<<dist<<endl;
                         robot_path[i].clear();
                         robot[i].status=GoingToGood;
                         // plan the path for each robot
@@ -427,17 +435,17 @@ public:
                     }
                     robot[i].action_move=static_cast<RobotMove>(robot_path[i].front());
                     robot_path[i].pop_front();
-                    cerr<<"robot "<<i<<" return path to berth: ";
+                    if(MY_DEBUG)cerr<<"robot "<<i<<" return path to berth: ";
                     for(auto p:robot_path[i]){
-                        cerr<<p<<' ';
-                    }cerr<<endl;
+                        if(MY_DEBUG)cerr<<p<<' ';
+                    }if(MY_DEBUG)cerr<<endl;
                 }
                 else{
                     robot[i].action_move=static_cast<RobotMove>(robot_path[i].front());
                     robot_path[i].pop_front();
                 }
             }
-            cerr<<"robot "<<i<<" action: "<<robot[i].action_before_move<<' '<<robot[i].action_move<<' '<<robot[i].action_after_move<<endl;
+            if(MY_DEBUG)cerr<<"robot "<<i<<" action: "<<robot[i].action_before_move<<' '<<robot[i].action_move<<' '<<robot[i].action_after_move<<endl;
         }
         
         // TODO: conflicts detection
@@ -448,6 +456,8 @@ public:
                 boat[i].status=-1;
                 boat[i].pos=i;
                 boat[i].berth_id = i*2;
+                berth[boat[i].berth_id].boat_id = i;
+                boat[i].timer_wait = WAIT_TIME;
             }
         }
         for(int i=0;i<5;i++){
@@ -456,6 +466,7 @@ public:
                 boat[i].status = 1;
                 boat[i].action = GO;
                 boat[i].berth_id = -1;
+                boat[berth[i].boat_id].berth_id = -1;
                 continue;
             }
             if(boat[i].status==-1){
@@ -466,35 +477,57 @@ public:
                 if(boat[i].berth_id==-1){
                     boat[i].action = SHIP;
                     boat[i].berth_id = i*2;
+                    berth[boat[i].berth_id].boat_id = i;
                     boat[i].goods = 0;
                 }
                 else if(boat[i].berth_id%2==0){ // 还在第一个泊位
-                    if(berth[boat[i].berth_id].goods==0 || berth[boat[i].berth_id+1].goods>boat_capacity-boat[i].goods || boat[i].goods>=boat_capacity*0.2){
+                    if(berth[boat[i].berth_id].goods==0) boat[i].timer_wait--;
+                    if(berth[boat[i].berth_id+1].goods>boat_capacity-boat[i].goods || boat[i].goods>=boat_capacity*0.49 || boat[i].timer_wait==0){
+                        if(MY_DEBUG)cerr<<"boat to go "<<i<<"  "<<(berth[boat[i].berth_id].goods==0) << (berth[boat[i].berth_id+1].goods>boat_capacity-boat[i].goods) << (boat[i].goods>=boat_capacity*0.3)<<endl;
                         boat[i].action = SHIP;
                         boat[i].berth_id++;
+                        berth[boat[i].berth_id].boat_id = i;
                     }
                 }
                 else if(boat[i].berth_id%2==1){ // 在第二个泊位
-                    if(berth[boat[i].berth_id].goods==0 || boat[i].goods>=boat_capacity*0.8){
-                        cerr<<"boat "<<i<<" go"<<endl;
+                    if(berth[boat[i].berth_id].goods==0) boat[i].timer_wait--;
+                    if(boat[i].timer_wait==0 || boat[i].goods>=boat_capacity*0.98){
+                        if(MY_DEBUG)cerr<<"boat "<<i<<" go"<<endl;
                         boat[i].action = GO;
                         boat[i].berth_id=-1;
+                        berth[boat[i].berth_id].boat_id = -1;
                     }
                 }
             }
         }
         // berth action
+        if(MY_DEBUG)cerr<<"berth load num: ";
         for(int i=0;i<berth_num;i++){
             int boat_id = berth[i].boat_id;
             if(boat_id!=-1){
                 if(boat[boat_id].goods<boat_capacity & berth[i].goods>0){
                     int load_num = min(berth[i].loading_speed, min(boat_capacity-boat[boat_id].goods, berth[i].goods));
+                    if(MY_DEBUG)cerr<<load_num<<' ';
                     berth[i].goods-=load_num;
                     boat[boat_id].goods+=load_num;
-                }
+                    boat[boat_id].timer_wait = WAIT_TIME;
+                }else if(MY_DEBUG)cerr<<0<<' ';
             }
+            else if(MY_DEBUG)cerr<<0<<' ';
         }
+        if(MY_DEBUG)cerr<<endl;
 
+        if(MY_DEBUG)cerr<<"boat goods: ";
+        for(int i=0;i<5;i++){
+            if(MY_DEBUG)cerr<<boat[i].goods<<' ';
+        }
+        if(MY_DEBUG)cerr<<endl;
+
+        if(MY_DEBUG)cerr<<"berth goods: ";
+        for(int i=0;i<10;i++){
+            if(MY_DEBUG)cerr<<berth[i].goods<<' ';
+        }
+        if(MY_DEBUG)cerr<<endl;
     }
     void Output(){
         for(int i=0;i<robot_num;i++){
@@ -508,7 +541,7 @@ public:
                 printf("move %d %d\n", i, robot[i].action_move);
         }
         for(int i=0;i<5;i++){
-            cerr<<"boat "<<i<<" action: "<<boat[i].action<<' '<<boat[i].berth_id<<endl;
+            if(MY_DEBUG)cerr<<"boat "<<i<<" action: "<<boat[i].action<<' '<<boat[i].berth_id<<endl;
             if(boat[i].action==SHIP){
                 printf("ship %d %d\n", i, boat[i].berth_id);
             }
