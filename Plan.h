@@ -3,12 +3,13 @@
 const int robot_num=10;
 const int berth_num=10;
 const int n = 200;
-const int MAX_DIST=1e3;
+const int MAX_DIST=1e5;
 int dx[4]={0,0,-1,1};
 int dy[4]={1,-1,0,0};
 const int time_between_berth=500;
 // in the map, '.' means empty, 'A' means robot, 'B' means berth(4x4),
 // '#' means obstacle, '*' means ocean (same as obstacle which robot cannot pass through)
+const int see_log=1;
 
 using namespace std;
 class Plan
@@ -76,7 +77,7 @@ public:
             boat[i].berth_id = -1;
         }
 
-        {
+        if(see_log){
             ofstream out("../LinuxRelease/log/ch.txt");
             for(int i=0;i<n;i++){
                 for(int j=0;j<n;j++){
@@ -99,7 +100,7 @@ public:
             }
 
         cerr<<"map init done"<<endl;
-        {
+        if(see_log){
             ofstream out("../LinuxRelease/log/map.txt");
             for(int i=0;i<n;i++){
                 for(int j=0;j<n;j++){
@@ -178,16 +179,17 @@ public:
             }
         }
         cerr<<"parts assigned"<<endl;
-        for(int i=0;i<berth_num;i++){
-            ofstream out("../LinuxRelease/log/berth"+to_string(i)+"_dist.txt");
-            for(int j=0;j<n;j++){
-                for(int k=0;k<n;k++){
-                    out<<setw(5)<<shortest_dist_to_berth[i][j][k];
+        if(see_log){
+            for(int i=0;i<berth_num;i++){
+                ofstream out("../LinuxRelease/log/berth"+to_string(i)+"_dist.txt");
+                for(int j=0;j<n;j++){
+                    for(int k=0;k<n;k++){
+                        out<<setw(5)<<shortest_dist_to_berth[i][j][k];
+                    }
+                    out<<endl;
                 }
-                out<<endl;
+                out.close();
             }
-        }
-        {
             ofstream out("../LinuxRelease/log/parts.txt");
             for(int i=0;i<n;i++){
                 for(int j=0;j<n;j++){
@@ -199,11 +201,11 @@ public:
             out.close();
         }
 
-        short parts_check[210][210];
-        for(int i=0;i<n;i++){
-            memcpy(parts_check[i],parts[i],sizeof(short)*n);
-        }
-        cerr<<"parts check start"<<endl;
+        // short parts_check[210][210];
+        // for(int i=0;i<n;i++){
+        //     memcpy(parts_check[i],parts[i],sizeof(short)*n);
+        // }
+        // cerr<<"parts check start"<<endl;
         // 检查每个区域的连通性
         // for(int i=0;i<berth_num;i++){
         //     std::queue<std::pair<int,int>> q;
@@ -255,7 +257,7 @@ public:
                 continue;
             }
             for(int j=0;j<10;j++){
-                if(flag[j]==0){
+                if(flag[j]==0 && shortest_dist_to_berth[j][x][y]!=MAX_DIST){
                     robot[i].berth_id=j;
                     flag[j]++;
                     break;
@@ -354,6 +356,7 @@ public:
                     cerr<<"planing the path for robot "<<i<<endl;
                     // plan the path to the nearest goods
                     int dist=MAX_DIST;
+                    
                     for(int t=0;t<berth_region[berth_id].size();t++){
                         int x=berth_region[berth_id][t].first;
                         int y=berth_region[berth_id][t].second;
