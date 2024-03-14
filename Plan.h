@@ -277,7 +277,7 @@ public:
             robot[i].sys_status=1;
             if(dist==MAX_DIST){
                 cerr<< "robot" <<i<<" cannot reach berth "<<id<<", robot coordinates: "<<x<<" "<<y<<endl;
-                exit(0);
+                // exit(0);
             }
             robot_path_len[i]=dist;
             while(x!=bx||y!=by){
@@ -331,6 +331,7 @@ public:
         for(int i=0;i<robot_num;i++){
             cerr<<"robot "<<i<<" status: "<<robot[i].status<<endl;
             if(robot[i].sys_status==0){
+                if(robot[i].action_move!=RA_NOTHING)robot_path[i].push_front(robot[i].action_move); // 先加上恢复状态保证程序不崩溃
                 robot[i].status=NotReady;
                 robot[i].action_before_move=RA_NOTHING;
                 robot[i].action_move=STAND;
