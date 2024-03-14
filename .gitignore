@@ -1,6 +1,6 @@
 build
-LinuxRelease
 doc
 .vscode
 .vs
 out
+LinuxRelease*

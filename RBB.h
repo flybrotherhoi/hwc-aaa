@@ -1,7 +1,17 @@
 #include<bits/stdc++.h>
-enum RobotAction{GET, PULL};
+using namespace std;
+enum RobotAction{GET, PULL, RA_NOTHING};
 enum RobotStatus{NotReady, ReadyToGo, GoingToGood, ReturnToBerth};
 enum RobotMove{RIGHT, LEFT, UP, DOWN, STAND};
+enum BoatAction{SHIP, GO, BA_NOTHING};
+
+RobotMove ReverseRobotMove(const RobotMove &move) {
+    if(move == RIGHT) return LEFT;
+    else if(move == LEFT) return RIGHT;
+    else if(move == UP) return DOWN;
+    else if(move == DOWN) return UP;
+    return STAND;
+};
 
 class Robot
 {
@@ -35,6 +45,7 @@ public:
     int loading_speed;
     int boat_id;
     int robot_id;
+    int goods;
     Berth(){
         x = 0;
         y = 0;
@@ -42,6 +53,7 @@ public:
         loading_speed = 0;
         boat_id = -1;
         robot_id = -1;
+        goods = 0;
     }
     Berth(int x, int y, int transport_time, int loading_speed) {
         this -> x = x;
@@ -54,14 +66,15 @@ public:
 class Boat
 {
 public:
-    int num, pos, status;
+    int num, pos;
+    int status;
     int goods;
-    int berth_id[10];
+    int berth_id;
+    BoatAction action;
     Boat() {
         num = 0;
         pos = 0;
         status = 0;
         goods = 0;
-        memset(berth_id, -1, sizeof(berth_id));
     }
 };
