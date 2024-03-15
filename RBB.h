@@ -52,12 +52,6 @@ public:
         robot_id = -1;
         goods = 0;
     }
-    Berth(int x, int y, int transport_time, int loading_speed) {
-        this -> x = x;
-        this -> y = y;
-        this -> transport_time = transport_time;
-        this -> loading_speed = loading_speed;
-    }
 };
 
 class Boat
@@ -65,9 +59,10 @@ class Boat
 public:
     int num, pos;
     int status;
-    int goods;
+    int goods, goods_val;
     int berth_id;
     int timer_wait;
+    int times_between_berth;
     BoatAction action;
     Boat() {
         num = 0;

@@ -29,8 +29,10 @@ public:
     void Output();
     void Process();
     void RobotDo();
-    void BoatDo();
+    void BoatDoPlain();
+    void BoatDoGreedy();
     void BerthDo();
+    void Summary();
 };
 
 #endif

@@ -1,5 +1,10 @@
 #include<bits/stdc++.h>
 #include "Plan.h"
+const int MY_DEBUG=0;
+const int see_log=0;
+const int analysis = 0;
+vector<int> fetch_time;
+long fetch_num, send_num;
 
 const int robot_num=10;
 const int berth_num=10;
@@ -8,11 +13,10 @@ const int MAX_DIST=1e5;
 int dx[4]={0,0,-1,1};
 int dy[4]={1,-1,0,0};
 const int time_between_berth=500;
-// in the map, '.' means empty, 'A' means robot, 'B' means berth(4x4),
-// '#' means obstacle, '*' means ocean (same as obstacle which robot cannot pass through)
-const int see_log=0;
 const int WAIT_TIME=50;
-const int MY_DEBUG=0;
+const int MORE_WAIT=1;
+const int MAX_TIMES_BETWEEN_BERTH=2;
+bool robot_good[10];
 
 RobotMove ReverseRobotMove(const RobotMove &move) {
     if(move == RIGHT) return LEFT;
@@ -104,12 +108,7 @@ void Plan::Init()
         }
         out.close();
     }
-    // for(int i=0;i<berth_num;i++){
-    //     int x = berth[i].x;
-    //     int y = berth[i].y;
-    //     for(int j=0;j<4;j++)for(int k=0;k<4;k++)map[x+j][y+k]=i;
-    // }
-    
+
     // 给每个泊位分配一个区域
     for (int i=0;i<n;i++){
         for (int j=0;j<n;j++){
@@ -242,6 +241,7 @@ void Plan::Init()
     for(int i=0;i<robot_num;i++){
         int x=robot[i].x;
         int y=robot[i].y;
+        robot[i].berth_id=-1;
         if(flag[parts[x][y]]==0){
             robot[i].berth_id=parts[x][y];
             berth[parts[x][y]].robot_id=i;
@@ -255,12 +255,19 @@ void Plan::Init()
                 break;
             }
         }
+        if(robot[i].berth_id==-1){
+            robot_good[i]=false;
+        }
+        else{
+            robot_good[i]=true;
+        }
     }
     if(MY_DEBUG)cerr<<"robot assigned to berth"<<endl;
 
     // plan the path for each robot
     vector<pair<int,int>> vec_robot_path[10]; // 为了检测冲突好遍历用的数组
     for(int i=0;i<robot_num;i++){
+        if(robot_good[i]==false)continue;
         if(MY_DEBUG)cerr<<"finding the path for robot "<<i<<endl;
         int x=robot[i].x;
         int y=robot[i].y;
@@ -318,10 +325,12 @@ void Plan::Init()
 
     //robot path conflicts detection
     for(int i=0;i<10;i++){
+        if(robot_good[i]==false)continue;
         robot[i].start_delay=0;
         int conflict_flag=0;
         vector<int> conflict_id;
         for(int j=0;j<i;j++){
+            if(robot_good[j]==false)continue;
             int t=0;
             while(t+robot[j].start_delay+1<vec_robot_path[i].size()&&t<vec_robot_path[j].size()&&
                 diff_pair(vec_robot_path[i][t+robot[j].start_delay],vec_robot_path[j][t]) &&
@@ -438,12 +447,14 @@ void Plan::Output()
 
 void Plan::RobotDo()
 {
-        int robot_not_ready=0;
+    int robot_not_ready=0;
     for(int i=0;i<robot_num;i++){
+        if(robot_good[i]==false)continue;
         robot_not_ready += robot[i].status==RobotStatus::NotReady;
     }
     if(MY_DEBUG)cerr<<"robot not ready: "<<robot_not_ready<<endl;
     for(int i=0;i<robot_num;i++){
+        if(robot_good[i]==false)continue;
         if(MY_DEBUG)cerr<<"robot "<<i<<" status: "<<robot[i].status<<endl;
         if(robot[i].start_delay>0){
             robot[i].status=NotReady;
@@ -474,6 +485,7 @@ void Plan::RobotDo()
                 if(robot[i].goods==1){
                     robot[i].action_before_move=PULL;
                     berth[berth_id].goods++;
+                    fetch_num++;
                 }
                 if(MY_DEBUG)cerr<<"planing the path for robot "<<i<<endl;
                 // plan the path to the nearest goods
@@ -495,6 +507,7 @@ void Plan::RobotDo()
                     if(MY_DEBUG)cerr<<"robot "<<i<<" going to goods: "<<robot[i].gx<<' '<<robot[i].gy<<", dist= "<<dist<<endl;
                     robot_path[i].clear();
                     robot[i].status=GoingToGood;
+                    fetch_time.push_back(dist);
                     // plan the path for each robot
                     deque<pair<int,int>> q;
                     q.push_back({robot[i].gx,robot[i].gy});
@@ -568,7 +581,7 @@ void Plan::RobotDo()
     }
 }
 
-void Plan::BoatDo()
+void Plan::BoatDoPlain()
 {
     // define the action for boats
     if(fid==1){
@@ -623,20 +636,102 @@ void Plan::BoatDo()
     }
 }
 
+void Plan::BoatDoGreedy()
+{
+    // define the action for boats
+    if(fid==1){
+        // 第一帧特殊处理
+        for(int i=0;i<5;i++){
+            boat[i].status=-1;
+            boat[i].pos=i;
+            boat[i].berth_id = i*2;
+            berth[boat[i].berth_id].boat_id = i;
+            boat[i].timer_wait = WAIT_TIME;
+            boat[i].times_between_berth = 0;
+        }
+    }
+    for(int i=0;i<5;i++){
+        boat[i].action = BA_NOTHING;
+        if(boat[i].berth_id!=-1 && (15000-fid)<= berth[boat[i].berth_id].transport_time+20){
+            // at last we should all go
+            boat[i].status = 1;
+            boat[i].action = GO;
+            boat[i].berth_id = -1;
+            boat[berth[i].boat_id].berth_id = -1;
+            boat[i].times_between_berth = 0;
+            continue;
+        }
+        if(boat[i].status==-1){
+            boat[i].status = 0;
+            boat[i].action = SHIP;
+        }
+        else if(boat[i].status==1){ //完成或装货状态
+            if(boat[i].berth_id==-1){   // 刚送完货
+                boat[i].goods = 0;
+                boat[i].times_between_berth = 0;
+                int best_berth = -1;
+                int max_goods = -1;
+                for(int ii=0;ii<berth_num;ii++){
+                    if(berth[ii].goods>max_goods && berth[ii].boat_id==-1){
+                        max_goods = berth[ii].goods;
+                        best_berth = ii;
+                    }
+                }
+                if(best_berth!=-1){
+                    boat[i].berth_id = best_berth;
+                    berth[best_berth].boat_id = i;
+                    boat[i].action = SHIP;
+                    boat[i].timer_wait = WAIT_TIME;
+                }
+            }
+            else{
+                if(berth[boat[i].berth_id].goods==0) boat[i].timer_wait-=5;
+                if(boat[i].goods>=boat_capacity*0.95){
+                    boat[i].action = GO;
+                    boat[i].berth_id= -1;
+                    boat[i].times_between_berth = 0;
+                    berth[boat[i].berth_id].boat_id = -1;
+                }
+                int best_berth = -1;
+                int most_goods = -1;
+                for(int ii=0;ii<berth_num;ii++){
+                    if(berth[ii].goods>most_goods && berth[ii].boat_id==-1){
+                        most_goods = berth[ii].goods;
+                        best_berth = ii;
+                    }
+                }
+                if((boat[i].timer_wait<=0 && most_goods+boat[i].goods>boat_capacity*0.8)
+                    && boat[i].times_between_berth<MAX_TIMES_BETWEEN_BERTH){
+                    boat[i].action = SHIP;  
+                    berth[boat[i].berth_id].boat_id = -1;
+                    boat[i].berth_id= best_berth;
+                    berth[boat[i].berth_id].boat_id = i;
+                    boat[i].times_between_berth++;
+                }
+                if(boat[i].timer_wait<=0 && boat[i].times_between_berth>=MAX_TIMES_BETWEEN_BERTH){
+                    boat[i].action = GO;
+                    boat[i].berth_id= -1;
+                    boat[i].times_between_berth = 0;
+                    berth[boat[i].berth_id].boat_id = -1;
+                }
+            }
+        }
+    }
+}
+
 void Plan::BerthDo()
 {
     // berth action
     if(MY_DEBUG)cerr<<"berth load num: ";
     for(int i=0;i<berth_num;i++){
         int boat_id = berth[i].boat_id;
-        if(boat_id!=-1){
-            if(boat[boat_id].goods<boat_capacity & berth[i].goods>0){
-                int load_num = min(berth[i].loading_speed, min(boat_capacity-boat[boat_id].goods, berth[i].goods));
-                if(MY_DEBUG)cerr<<load_num<<' ';
-                berth[i].goods-=load_num;
-                boat[boat_id].goods+=load_num;
-                boat[boat_id].timer_wait = WAIT_TIME;
-            }else if(MY_DEBUG)cerr<<0<<' ';
+        if(boat_id!=-1 && boat[boat_id].status==1 && boat[boat_id].berth_id==i && berth[i].goods>0){
+            int load_num = min(berth[i].loading_speed, berth[i].goods);
+            if(MY_DEBUG)cerr<<load_num<<' ';
+            berth[i].goods-=load_num;
+            boat[boat_id].goods+=load_num;
+            send_num+=load_num;
+            boat[boat_id].timer_wait =min(WAIT_TIME, MORE_WAIT+boat[boat_id].timer_wait);
         }
         else if(MY_DEBUG)cerr<<0<<' ';
     }
@@ -658,6 +753,23 @@ void Plan::BerthDo()
 void Plan::Process()
 {
     RobotDo();
-    BoatDo();
+    BoatDoPlain();
     BerthDo();
+}
+
+void Plan::Summary()
+{
+    if(analysis){
+        ofstream out("../LinuxRelease/summary.txt");
+        out<<"fetch num: "<<fetch_num<<endl;
+        out<<"send num: "<<send_num<<endl;
+        out<<"fetch time: avg="<<accumulate(fetch_time.begin(),fetch_time.end(),0.0)/fetch_time.size()<<endl;
+        out<<endl;
+        out.close();
+        cerr<<"fetch num: "<<fetch_num<<endl;
+        cerr<<"send num: "<<send_num<<endl;
+        cerr<<"fetch time: avg="<<accumulate(fetch_time.begin(),fetch_time.end(),0.0)/fetch_time.size()<<endl;
+        cerr<<"fetch time: max="<<*max_element(fetch_time.begin(),fetch_time.end())<<endl;
+        cerr<<"fetch time: min="<<*min_element(fetch_time.begin(),fetch_time.end())<<endl;
+    }
 }
