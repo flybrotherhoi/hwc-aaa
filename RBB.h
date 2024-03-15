@@ -1,21 +1,12 @@
 #include<bits/stdc++.h>
-using namespace std;
+
+#ifndef _RBB_H_
+#define _RBB_H_
+
 enum RobotAction{GET, PULL, RA_NOTHING};
 enum RobotStatus{NotReady, ReadyToGo, GoingToGood, ReturnToBerth};
 enum RobotMove{RIGHT, LEFT, UP, DOWN, STAND};
 enum BoatAction{SHIP, GO, BA_NOTHING};
-
-RobotMove ReverseRobotMove(const RobotMove &move) {
-    if(move == RIGHT) return LEFT;
-    else if(move == LEFT) return RIGHT;
-    else if(move == UP) return DOWN;
-    else if(move == DOWN) return UP;
-    return STAND;
-};
-
-bool diff_pair(const pair<int, int> &a, const pair<int, int> &b) {
-    return a.first != b.first || a.second != b.second;
-}
 
 class Robot
 {
@@ -85,3 +76,6 @@ public:
         goods = 0;
     }
 };
+
+
+#endif
