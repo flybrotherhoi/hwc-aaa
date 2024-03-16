@@ -662,6 +662,10 @@ void Plan::BoatDoGreedy()
     berth[i]: 第i个泊位, berth[i].goods表示泊位i的货物数量, berth[i].boat_id表示停靠在泊位i的船的id
     MAX_TIMES_BETWEEN_BERTH: 最大泊位间转移次数
     WAIT_TIME: 设定的等待时间
+
+    输入：当前泊位货物和船的状态，以及当前帧数
+    输出：保存在船的动作中（boat[i].action），在Output中会统一输出，action为ship时需要设定好berth_id
+
     */
     // define the action for boats
     if(fid==1){
