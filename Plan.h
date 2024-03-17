@@ -13,11 +13,13 @@ public:
     Robot robot[10];
     Berth berth[10];
     std::deque<short> robot_path[10];
+    std::vector<pair<int,int>> pos_robot_path[10];
     short robot_path_len[10];
     std::vector<pair<int,int>> berth_region[10];
     Boat boat[10];
     char ch[210][210];
     short map[210][210];
+    short dynamic_map[210][210];
     short parts[210][210];
     int shortest_dist_to_berth[10][210][210];
     unsigned int fid;
@@ -30,10 +32,13 @@ public:
     void Output();
     void Process();
     void RobotDo();
+    void RobotDoGlobal();
     void BoatDoPlain();
     void BoatDoGreedy();
     void BerthDo();
     void Summary();
+    void UpdateShortestDistToBerth(short temp_map[210][210],int id);
+    void UpdateBerthRegion(int id);
 };
 
 #endif
