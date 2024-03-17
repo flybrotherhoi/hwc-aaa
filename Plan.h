@@ -26,6 +26,7 @@ public:
     Plan() {}
     void Init();
     int Input();
+    void DivideParts();
     void Output();
     void Process();
     void RobotDo();

@@ -30,62 +30,15 @@ bool diff_pair(const pair<int, int> &a, const pair<int, int> &b) {
     return a.first != b.first || a.second != b.second;
 }
 
-void Plan::Init()
-{
-    for(int i = 0; i < n; i ++)
-        scanf("%s", ch[i]);
-    for(int i = 0; i < berth_num; i ++)
-    {
-        int id;
-        scanf("%d", &id);
-        scanf("%d%d%d%d", &berth[id].x, &berth[id].y, &berth[id].transport_time, &berth[id].loading_speed);
-    }
-    scanf("%d", &boat_capacity);
-    char okk[100];
-    scanf("%s", okk);
-    if(MY_DEBUG)cerr<<"init start"<<endl;
-    // get the position of robots
-    int tid=0;
-    for(int i = 0; i < n; i ++)
-        for(int j = 0; j < n; j ++)
-        {
-            if(ch[i][j] == 'A')
-            {
-                robot[tid].x = i;
-                robot[tid].y = j;
-                tid++;
-            }
-        }
-    // initialize gds;
-    for(int i = 0; i < n; i ++)
-        for(int j = 0; j < n; j ++)
-        {   
-            gds[i][j] = 0;
-            gds_time[i][j] = 0;
-        }
-
-    // assign berth to boat
-    for(int i = 0; i < 5; i ++)
-    {
-        boat[i].pos = i;
-        boat[i].status = 0;
-        boat[i].num = 0;
-        boat[i].goods = 0;
-        boat[i].berth_id = -1;
-        boat[i].timer_wait = WAIT_TIME;
-    }
-
-    if(see_log){
-        ofstream out("../LinuxRelease/log/ch.txt");
-        for(int i=0;i<n;i++){
-            for(int j=0;j<n;j++){
-                out<<ch[i][j];
-            }
-            out<<endl;
-        }
-        out.close();
-    }
-    // initialize the map
+void Plan::DivideParts(){
+    /*
+    将地图划分为10个各自连通的区域。
+    ch[n][n]:   地图原始数据字符数据
+    map[n][n]:  地图原始数据的二值化数据，可通行区域为1，不可通行区域为0
+    parts[n][n]:地图划分的区域，-1表示不可通行区域，0-9表示各自的区域
+    berth位置:  berth[i].x, berth[i].y
+    shortest_dist_to_berth[10][210][210]: 存储每个泊位到每个点的最短距离
+    */
     for(int i = 0; i < n; i++)
         for(int j = 0; j < n; j++)
         {
@@ -192,6 +145,65 @@ void Plan::Init()
         out.close();
     }
 
+}
+
+void Plan::Init()
+{
+    for(int i = 0; i < n; i ++)
+        scanf("%s", ch[i]);
+    for(int i = 0; i < berth_num; i ++)
+    {
+        int id;
+        scanf("%d", &id);
+        scanf("%d%d%d%d", &berth[id].x, &berth[id].y, &berth[id].transport_time, &berth[id].loading_speed);
+    }
+    scanf("%d", &boat_capacity);
+    char okk[100];
+    scanf("%s", okk);
+    if(MY_DEBUG)cerr<<"init start"<<endl;
+    // get the position of robots
+    int tid=0;
+    for(int i = 0; i < n; i ++)
+        for(int j = 0; j < n; j ++)
+        {
+            if(ch[i][j] == 'A')
+            {
+                robot[tid].x = i;
+                robot[tid].y = j;
+                tid++;
+            }
+        }
+    // initialize gds;
+    for(int i = 0; i < n; i ++)
+        for(int j = 0; j < n; j ++)
+        {   
+            gds[i][j] = 0;
+            gds_time[i][j] = 0;
+        }
+
+    // assign berth to boat
+    for(int i = 0; i < 5; i ++)
+    {
+        boat[i].pos = i;
+        boat[i].status = 0;
+        boat[i].num = 0;
+        boat[i].goods = 0;
+        boat[i].berth_id = -1;
+        boat[i].timer_wait = WAIT_TIME;
+    }
+
+    if(see_log){
+        ofstream out("../LinuxRelease/log/ch.txt");
+        for(int i=0;i<n;i++){
+            for(int j=0;j<n;j++){
+                out<<ch[i][j];
+            }
+            out<<endl;
+        }
+        out.close();
+    }
+    DivideParts();
+
     // short parts_check[210][210];
     // for(int i=0;i<n;i++){
     //     memcpy(parts_check[i],parts[i],sizeof(short)*n);
@@ -223,8 +235,7 @@ void Plan::Init()
     //         // exit(0);
     //     }
     // }
-    
-    if(MY_DEBUG)cerr<<"parts check done"<<endl;
+    // if(MY_DEBUG)cerr<<"parts check done"<<endl;
 
     for(int i=0;i<n;i++){
         for(int j=0;j<n;j++){
@@ -496,7 +507,8 @@ void Plan::RobotDo()
                     int x=berth_region[berth_id][t].first;
                     int y=berth_region[berth_id][t].second;
                     float nvvt;
-                    nvvt = 5.0*gds[x][y]/(1.0*shortest_dist_to_berth[berth_id][x][y]);
+                    nvvt = 5.0*((1-fid/15000)/2+0.5)*gds[x][y]/(1.0*shortest_dist_to_berth[berth_id][x][y]);
+                    nvvt = gds[x][y]/(1.0*shortest_dist_to_berth[berth_id][x][y]);
                     if(gds[x][y]>0 && gds_time[x][y]+1000>fid+shortest_dist_to_berth[berth_id][x][y] && nvvt>vvt){
                         robot[i].gx=x;
                         robot[i].gy=y;
@@ -628,7 +640,10 @@ void Plan::BoatDoPlain()
             }
             else if(boat[i].berth_id%2==0){ // 还在第一个泊位
                 if(berth[boat[i].berth_id].goods==0) boat[i].timer_wait--;
-                if(berth[boat[i].berth_id+1].goods>boat_capacity-boat[i].goods || boat[i].goods>=boat_capacity*0.49 || boat[i].timer_wait==0){
+                if(berth[boat[i].berth_id+1].goods+boat[i].goods>boat_capacity*0.9 || 
+                        (boat[i].goods>=boat_capacity*0.5 && berth[boat[i].berth_id].goods<berth[boat[i].berth_id+1].goods) 
+                        || boat[i].timer_wait==0)
+                {
                     if(MY_DEBUG)cerr<<"boat to go "<<i<<"  "<<(berth[boat[i].berth_id].goods==0) << (berth[boat[i].berth_id+1].goods>boat_capacity-boat[i].goods) << (boat[i].goods>=boat_capacity*0.3)<<endl;
                     boat[i].action = SHIP;
                     boat[i].berth_id++;
@@ -637,7 +652,7 @@ void Plan::BoatDoPlain()
             }
             else if(boat[i].berth_id%2==1){ // 在第二个泊位
                 if(berth[boat[i].berth_id].goods==0) boat[i].timer_wait--;
-                if(boat[i].timer_wait==0 || boat[i].goods>=boat_capacity*0.98){
+                if(boat[i].timer_wait==0 || boat[i].goods>=boat_capacity*0.99){
                     if(MY_DEBUG)cerr<<"boat "<<i<<" go"<<endl;
                     boat[i].action = GO;
                     boat[i].berth_id=-1;
@@ -681,12 +696,12 @@ void Plan::BoatDoGreedy()
     }
     for(int i=0;i<5;i++){
         boat[i].action = BA_NOTHING;
-        if(boat[i].berth_id!=-1 && (15000-fid)<= berth[boat[i].berth_id].transport_time+20){
+        if(boat[i].berth_id!=-1 && (15000-fid)<= berth[boat[i].berth_id].transport_time+1){
             // at last we should all go
             boat[i].status = 1;
             boat[i].action = GO;
+            berth[boat[i].berth_id].boat_id = -1;
             boat[i].berth_id = -1;
-            boat[berth[i].boat_id].berth_id = -1;
             boat[i].times_between_berth = 0;
             continue;
         }
@@ -721,40 +736,45 @@ void Plan::BoatDoGreedy()
             else{
                 // 正在装货
                 if(berth[boat[i].berth_id].goods==0) boat[i].timer_wait-=1; // 泊位没货，耐心减1,这个值可以调
-                if(boat[i].goods>=boat_capacity*0.95){  //装货量达到95%，出发
+                if(boat[i].goods>=boat_capacity*0.99){  //装货量达到95%，出发
                     boat[i].action = GO;
+                    berth[boat[i].berth_id].boat_id = -1;
                     boat[i].berth_id= -1;
                     boat[i].times_between_berth = 0;
-                    berth[boat[i].berth_id].boat_id = -1;
                 }
+                else{
+                    // 没装够货，找一下当前没船停靠的最多货物的泊位
+                    int best_berth = -1;
+                    int most_goods = -1;
+                    for(int ii=0;ii<berth_num;ii++){
+                        if(berth[ii].goods>most_goods && berth[ii].boat_id==-1){
+                            most_goods = berth[ii].goods;
+                            best_berth = ii;
+                        }
+                    }
+                    assert(best_berth!=-1);
 
-                // 没装够货，找一下当前没船停靠的最多货物的泊位
-                int best_berth = -1;
-                int most_goods = -1;
-                for(int ii=0;ii<berth_num;ii++){
-                    if(berth[ii].goods>most_goods && berth[ii].boat_id==-1){
-                        most_goods = berth[ii].goods;
-                        best_berth = ii;
+                    // 如果找到了，并且当前泊位没货，且到达目标泊位后能到装货量的80%，就出发
+                    if(((boat[i].timer_wait<=0 && boat[i].goods<boat_capacity*0.8) || 
+                        (boat[i].timer_wait<=45) && boat[i].goods<boat_capacity*0.5 && most_goods+boat[i].goods>boat_capacity*0.6)
+                        && boat[i].times_between_berth<MAX_TIMES_BETWEEN_BERTH){
+                        boat[i].action = SHIP;  
+                        berth[boat[i].berth_id].boat_id = -1;
+                        boat[i].berth_id= best_berth;
+                        berth[boat[i].berth_id].boat_id = i;
+                        boat[i].times_between_berth++;
+                    }
+                    else{
+                        // 如果等待时间超过了，并且达到了最大的泊位间转移次数，就出发
+                        if(boat[i].timer_wait<=0 && boat[i].times_between_berth>=MAX_TIMES_BETWEEN_BERTH){
+                            boat[i].action = GO;
+                            berth[boat[i].berth_id].boat_id = -1;
+                            boat[i].berth_id= -1;
+                            boat[i].times_between_berth = 0;
+                        }
                     }
                 }
 
-                // 如果找到了，并且当前泊位没货，且到达目标泊位后能到装货量的80%，就出发
-                if((boat[i].timer_wait<=0 && most_goods+boat[i].goods>boat_capacity*0.8)
-                    && boat[i].times_between_berth<MAX_TIMES_BETWEEN_BERTH){
-                    boat[i].action = SHIP;  
-                    berth[boat[i].berth_id].boat_id = -1;
-                    boat[i].berth_id= best_berth;
-                    berth[boat[i].berth_id].boat_id = i;
-                    boat[i].times_between_berth++;
-                }
-
-                // 如果等待时间超过了，并且达到了最大的泊位间转移次数，就出发
-                if(boat[i].timer_wait<=0 && boat[i].times_between_berth>=MAX_TIMES_BETWEEN_BERTH){
-                    boat[i].action = GO;
-                    boat[i].berth_id= -1;
-                    boat[i].times_between_berth = 0;
-                    berth[boat[i].berth_id].boat_id = -1;
-                }
             }
         }
     }
@@ -784,17 +804,32 @@ void Plan::BerthDo()
     }
     if(MY_DEBUG)cerr<<endl;
 
-    if(MY_DEBUG)cerr<<"berth goods: ";
-    for(int i=0;i<10;i++){
-        if(MY_DEBUG)cerr<<berth[i].goods<<' ';
-    }
-    if(MY_DEBUG)cerr<<endl;
+    // if(fid%1000==0){
+    //     cerr<<"berth goods: ";
+    //     for(int i=0;i<10;i++){
+    //         cerr<<berth[i].goods<<'\t';
+    //     }
+    //     cerr<<endl;
+    //     cerr<<"berth boats: ";
+    //     for(int i=0;i<10;i++){
+    //         cerr<<berth[i].boat_id<<'\t';
+    //     }
+    //     cerr<<endl;
+    //     cerr<<"boats goods: ";
+    //     for(int i=0;i<10;i++){
+    //         if(berth[i].boat_id!=-1)cerr<<boat[berth[i].boat_id].goods<<'\t';
+    //         else cerr<<0<<'\t';
+    //     }
+    //     cerr<<endl;
+    //     cerr<<"---------------------------------------------------------------"<<endl;
+    // }
+
 }
 
 void Plan::Process()
 {
     RobotDo();
-    BoatDoPlain();
+    BoatDoGreedy();
     BerthDo();
 }
 
