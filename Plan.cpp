@@ -1102,7 +1102,7 @@ void Plan::BerthDo()
 
 void Plan::Process()
 {
-    RobotDoGlobal();
+    RobotDo();
     BoatDoGreedy();
     BerthDo();
 }
