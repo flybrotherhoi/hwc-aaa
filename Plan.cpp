@@ -1270,22 +1270,22 @@ void Plan::Process()
     if(fid==1){
         boat[0].MAX_TIMES_BETWEEN_BERTH = 2;
         boat[1].MAX_TIMES_BETWEEN_BERTH = 2;
-        boat[2].MAX_TIMES_BETWEEN_BERTH = 2;
-        boat[3].MAX_TIMES_BETWEEN_BERTH = 2;
-        boat[4].MAX_TIMES_BETWEEN_BERTH = 2;
+        boat[2].MAX_TIMES_BETWEEN_BERTH = 3;
+        boat[3].MAX_TIMES_BETWEEN_BERTH = 3;
+        boat[4].MAX_TIMES_BETWEEN_BERTH = 3;
     }
-    // if(fid==5000){
-    //     boat[0].MAX_TIMES_BETWEEN_BERTH = 1;
-    //     boat[1].MAX_TIMES_BETWEEN_BERTH = 1;
-    //     boat[2].MAX_TIMES_BETWEEN_BERTH = 1;
-    //     boat[3].MAX_TIMES_BETWEEN_BERTH = 2;
-    //     boat[4].MAX_TIMES_BETWEEN_BERTH = 2;
-    // }
-    if(fid==10000){
+    if(fid==5000){
         boat[0].MAX_TIMES_BETWEEN_BERTH = 1;
         boat[1].MAX_TIMES_BETWEEN_BERTH = 1;
         boat[2].MAX_TIMES_BETWEEN_BERTH = 1;
-        boat[3].MAX_TIMES_BETWEEN_BERTH = 3;
+        boat[3].MAX_TIMES_BETWEEN_BERTH = 2;
+        boat[4].MAX_TIMES_BETWEEN_BERTH = 2;
+    }
+    if(fid==11000){
+        boat[0].MAX_TIMES_BETWEEN_BERTH = 2;
+        boat[1].MAX_TIMES_BETWEEN_BERTH = 2;
+        boat[2].MAX_TIMES_BETWEEN_BERTH = 3;
+        boat[3].MAX_TIMES_BETWEEN_BERTH = 4;
         boat[4].MAX_TIMES_BETWEEN_BERTH = 4;
     }
     RobotDo();
