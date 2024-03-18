@@ -4,14 +4,14 @@
 #define _RBB_H_
 
 enum RobotAction{GET, PULL, RA_NOTHING};
-enum RobotStatus{NotReady, ReadyToGo, GoingToGood, ReturnToBerth};
+enum RobotStatus{NotReady, ReadyToGo, GoingToGood, ReturnToBerth, Collision};
 enum RobotMove{RIGHT, LEFT, UP, DOWN, STAND};
 enum BoatAction{SHIP, GO, BA_NOTHING};
 
 class Robot
 {
 public:
-    int x, y, gx, gy, goods;
+    int x, y, gx, gy, goods, goods_val;
     RobotStatus status;     // -1=not ready; 0=idle; 1=going to goods; 2=return to berth
     int sys_status; // 0=restore, 1=normal;
     int berth_id;
@@ -43,6 +43,7 @@ public:
     int boat_id;
     int robot_id;
     int goods;
+    std::vector<int> goods_val_lst;
     Berth(){
         x = 0;
         y = 0;
@@ -63,6 +64,7 @@ public:
     int berth_id;
     int timer_wait;
     int times_between_berth;
+    int MAX_TIMES_BETWEEN_BERTH;
     BoatAction action;
     Boat() {
         num = 0;
