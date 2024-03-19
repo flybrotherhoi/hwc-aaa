@@ -1940,7 +1940,7 @@ void Plan::BoatDoGreedyMore(){
             boat[i].status=-1;
             boat[i].pos=i;
             boat[i].berth_id = i*2;
-            berth[boat[i].berth_id].boat_id = i;
+            // berth[boat[i].berth_id].boat_id = i;
             berth[boat[i].berth_id].boat_lst.push_back(i);
             boat[i].timer_wait = WAIT_TIME;
             boat[i].times_between_berth = 0;
@@ -1974,10 +1974,10 @@ void Plan::BoatDoGreedyMore(){
                 for(int ii=0;ii<berth_num;ii++){
                     int remain_goods = berth[ii].goods;
                     for(auto b:berth[ii].boat_lst){
-                        berth[ii].remain_goods -= boat_capacity-boat[b].goods;
+                        remain_goods -= boat_capacity-boat[b].goods;
                     }
-                    if(berth[ii].remain_goods>max_goods){
-                        max_goods = berth[ii].remain_goods;
+                    if(remain_goods>max_goods){
+                        max_goods = remain_goods;
                         best_berth = ii;
                     }
                 }
@@ -2016,10 +2016,10 @@ void Plan::BoatDoGreedyMore(){
                     for(int ii=0;ii<berth_num;ii++){
                         int remain_goods = berth[ii].goods;
                         for(auto b:berth[ii].boat_lst){
-                            berth[ii].remain_goods -= boat_capacity-boat[b].goods;
+                            remain_goods -= boat_capacity-boat[b].goods;
                         }
-                        if(berth[ii].remain_goods>max_goods){
-                            max_goods = berth[ii].remain_goods;
+                        if(remain_goods>max_goods){
+                            max_goods = remain_goods;
                             best_berth = ii;
                         }
                     }
