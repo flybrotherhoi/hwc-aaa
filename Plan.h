@@ -27,11 +27,14 @@ public:
     int gds_time[210][210];
     Plan() {}
     void Init();
+    void InitPlanB();
     int Input();
     void DivideParts();
     void Output();
     void Process();
+    bool RoutePlan(short tmap[210][210], int id);
     void RobotDo();
+    void RobotDoNow();
     void RobotDoGlobal();
     void BoatDoPlain();
     void BoatDoGreedy();
@@ -39,6 +42,7 @@ public:
     void BerthDo();
     void Summary();
     void UpdateShortestDistToBerth(short temp_map[210][210],int id);
+    void UpdateShortestDistToBerthAndParts(short temp_map[210][210],int id);
     void UpdateShortestDistToBerthAndParts(int id);
     void UpdateBerthRegion(int id);
 };
