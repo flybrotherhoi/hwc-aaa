@@ -41,8 +41,9 @@ public:
     int transport_time;
     int loading_speed;
     int boat_id;
+    std::vector<int> boat_lst;
     int robot_id;
-    int goods;
+    int goods,remain_goods;
     std::vector<int> goods_val_lst;
     Berth(){
         x = 0;

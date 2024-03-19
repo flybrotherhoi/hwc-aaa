@@ -38,7 +38,7 @@ public:
     void RobotDoGlobal();
     void BoatDoPlain();
     void BoatDoGreedy();
-    void BoatDoGreedyStage2();
+    void BoatDoGreedyMore();
     void BerthDo();
     void Summary();
     void UpdateShortestDistToBerth(short temp_map[210][210],int id);

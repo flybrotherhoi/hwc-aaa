@@ -279,7 +279,7 @@ void Plan::Init()
     char okk[100];
     scanf("%s", okk);
     if(MY_DEBUG)cerr<<"init start"<<endl;
-    // 把泊位的位置初始化到中间
+    // 把泊位的位置初始化离岸最近的位置
     for(int i=0;i<berth_num;i++){
         int sea_line[4] = {0,0,0,0};
         // 看4条边上跟海相邻的点的个数
@@ -861,12 +861,12 @@ void Plan::RobotDo()
             robot[i].action_before_move=RA_NOTHING;
             robot[i].action_move=STAND;
             robot[i].action_after_move=RA_NOTHING;
-            // cerr<<"robot "<<i<<" is in collision, its (gx,gy)= "<< robot[i].gx<<", "<<robot[i].gy<<", its position= <"<<robot[i].x<<","<<robot[i].y<<">"<<endl;
-            // cerr<<"it's path is: ";
-            // for(int j=0;j<pos_robot_path[i].size();j++){
-            //     cerr<<"("<<pos_robot_path[i][j].first<<','<<pos_robot_path[i][j].second<<") ";
-            // }
-            // cerr<<endl;
+            cerr<<"robot "<<i<<" is in collision, its (gx,gy)= "<< robot[i].gx<<", "<<robot[i].gy<<", its position= <"<<robot[i].x<<","<<robot[i].y<<">"<<endl;
+            cerr<<"it's path is: ";
+            for(int j=0;j<pos_robot_path[i].size();j++){
+                cerr<<"("<<pos_robot_path[i][j].first<<','<<pos_robot_path[i][j].second<<") ";
+            }
+            cerr<<endl;
             continue;
         }
         robot[i].action_move=STAND;
@@ -1192,7 +1192,51 @@ void Plan::RobotDoNow()
                 cerr<<"("<<pos_robot_path[i][j].first<<','<<pos_robot_path[i][j].second<<") ";
             }
             cerr<<endl;
-            continue;
+            // 规划一条回泊位的路线，重新开始
+            int x=robot[i].x;
+            int y=robot[i].y;
+            int dist=shortest_dist_to_berth[robot[i].berth_id][x][y];
+            robot[i].status=ReturnToBerth;
+            short temp_map[210][210];
+            if(robot_init_influenced_pos.size()>0){
+                copy_map(map,temp_map);
+                for(auto p:robot_init_influenced_pos){
+                    temp_map[p.first][p.second]=0;
+                }
+                UpdateShortestDistToBerthAndParts(temp_map, robot[i].berth_id);
+            }
+            else{
+                copy_map(map,temp_map);
+            }
+            robot[i].gx = berth[robot[i].berth_id].x;
+            robot[i].gy = berth[robot[i].berth_id].y;
+            robot_path[i].clear();
+            pos_robot_path[i].clear();
+            deque<pair<int,int>> q;
+            q.push_back({robot[i].x,robot[i].y});
+            pos_robot_path[i].push_back(make_pair(robot[i].x,robot[i].y));
+            while(!q.empty()){
+                auto [x,y]=q.front();
+                q.pop_front();
+                // if(x==robot[i].x&&y==robot[i].y)break;
+                for(int k=0;k<4;k++){
+                    int nx=x+dx[k];
+                    int ny=y+dy[k];
+                    if(nx>=0&&nx<n&&ny>=0&&ny<n&&temp_map[nx][ny]==1&&shortest_dist_to_berth[robot[i].berth_id][nx][ny]<shortest_dist_to_berth[robot[i].berth_id][x][y]){
+                        q.push_back({nx,ny});
+                        robot_path[i].push_back(static_cast<RobotMove>(k));
+                        pos_robot_path[i].push_back(make_pair(nx,ny));
+                        break;
+                    }
+                }
+            }
+            // robot[i].action_move=static_cast<RobotMove>(robot_path[i].front());
+            // robot_path[i].pop_front();
+            if(robot_init_influenced_pos.size()>0)UpdateShortestDistToBerthAndParts(map, robot[i].berth_id);
+            if(MY_DEBUG)cerr<<"robot "<<i<<" return path to berth: ";
+            for(auto p:robot_path[i]){
+                if(MY_DEBUG)cerr<<p<<' ';
+            }if(MY_DEBUG)cerr<<endl;
         }
         robot[i].action_move=STAND;
         robot[i].action_before_move=RA_NOTHING;
@@ -1871,6 +1915,147 @@ void Plan::BerthDo()
 
 }
 
+void Plan::BoatDoGreedyMore(){
+        /*
+    boat_capacity: 船的最大货物容量
+    boat[i]: 第i艘船
+    boat[i].status: 船的状态，-1表示刚开始，0表示移动中，1表示在装货或刚在虚拟点完成送货, 2表示泊位外等待（目前没用到）
+    boat[i].pos: 船的位置
+    boat[i].berth_id: 船停靠或要停靠的泊位，-1为虚拟点
+    boat[i].timer_wait: 船停靠没货可装时的等待时间，最大时间为WAIT_TIME，
+                        还有一个影响等待时间的地方是BerthDo中给船装货后，目前是加上一个值，并且不超过WAIT_TIME
+    boat[i].action: 船的动作，SHIP表示停靠，GO表示离开，BA_NOTHING表示无动作
+    berth[i]: 第i个泊位, berth[i].goods表示泊位i的货物数量, berth[i].boat_id表示停靠在泊位i的船的id
+    MAX_TIMES_BETWEEN_BERTH: 最大泊位间转移次数
+    WAIT_TIME: 设定的等待时间
+
+    输入：当前泊位货物和船的状态，以及当前帧数
+    输出：保存在船的动作中（boat[i].action），在Output中会统一输出，action为ship时需要设定好berth_id
+
+    */
+    // define the action for boats
+    if(fid==1){
+        // 第一帧特殊处理，任务书里说的船一开始的状态输入无效，全在虚拟点
+        for(int i=0;i<5;i++){
+            boat[i].status=-1;
+            boat[i].pos=i;
+            boat[i].berth_id = i*2;
+            berth[boat[i].berth_id].boat_id = i;
+            berth[boat[i].berth_id].boat_lst.push_back(i);
+            boat[i].timer_wait = WAIT_TIME;
+            boat[i].times_between_berth = 0;
+        }
+    }
+    for(int i=0;i<5;i++){
+        boat[i].action = BA_NOTHING;
+        if(boat[i].berth_id!=-1 && (15000-fid)<= berth[boat[i].berth_id].transport_time+1){
+            // at last we should all go
+            boat[i].status = 0;
+            boat[i].action = GO;
+            berth[boat[i].berth_id].boat_id = -1;
+            berth[boat[i].berth_id].boat_lst.erase(std::remove_if(berth[boat[i].berth_id].boat_lst.begin(), berth[boat[i].berth_id].boat_lst.end(), [i](int num) { return num == i; }),berth[boat[i].berth_id].boat_lst.end());
+            boat[i].berth_id = -1;
+            boat[i].times_between_berth = 0;
+            boat[i].timer_wait = WAIT_TIME;
+            continue;
+        }
+        if(boat[i].status==-1){
+            boat[i].status = 0;
+            boat[i].action = SHIP;
+        }
+        else if(boat[i].status==1){ //完成或装货状态
+            if(boat[i].berth_id==-1){   // 刚送完货
+                boat[i].goods = 0;
+                boat[i].times_between_berth = 0;
+
+                // 寻找最多货物的泊位
+                int best_berth = -1;
+                int max_goods = -1;
+                for(int ii=0;ii<berth_num;ii++){
+                    int remain_goods = berth[ii].goods;
+                    for(auto b:berth[ii].boat_lst){
+                        berth[ii].remain_goods -= boat_capacity-boat[b].goods;
+                    }
+                    if(berth[ii].remain_goods>max_goods){
+                        max_goods = berth[ii].remain_goods;
+                        best_berth = ii;
+                    }
+                }
+                // ------------------
+
+                // 已找到并绑定
+                if(best_berth!=-1){
+                    boat[i].berth_id = best_berth;
+                    berth[best_berth].boat_lst.push_back(i);
+                    boat[i].action = SHIP;
+                    boat[i].status = 0;
+                    boat[i].timer_wait = WAIT_TIME;
+                }
+            }
+            else{
+                // 正在装货
+                berth[boat[i].berth_id].boat_id = i;
+                if(berth[boat[i].berth_id].boat_lst[0]!=i){
+                    berth[boat[i].berth_id].boat_lst.erase(berth[boat[i].berth_id].boat_lst.begin());
+                    assert(berth[boat[i].berth_id].boat_lst[0]==i);
+                }
+                if(berth[boat[i].berth_id].goods==0) boat[i].timer_wait-=1; // 泊位没货，耐心减1,这个值可以调
+                if(boat[i].goods>=boat_capacity*0.99){  //装货量达到95%，出发
+                    boat[i].action = GO;
+                    boat[i].status = 0;
+                    berth[boat[i].berth_id].boat_id = -1;
+                    berth[boat[i].berth_id].boat_lst.erase(berth[boat[i].berth_id].boat_lst.begin());
+                    boat[i].berth_id= -1;
+                    boat[i].times_between_berth = 0;
+                    boat[i].timer_wait = WAIT_TIME;
+                }
+                else{
+                    // 没装够货，找一下当前没船停靠的最多货物的泊位
+                    int best_berth = -1;
+                    int max_goods = -1;
+                    for(int ii=0;ii<berth_num;ii++){
+                        int remain_goods = berth[ii].goods;
+                        for(auto b:berth[ii].boat_lst){
+                            berth[ii].remain_goods -= boat_capacity-boat[b].goods;
+                        }
+                        if(berth[ii].remain_goods>max_goods){
+                            max_goods = berth[ii].remain_goods;
+                            best_berth = ii;
+                        }
+                    }
+                    assert(best_berth!=-1);
+
+                    // 如果找到了，并且当前泊位没货，且到达目标泊位后能到装货量的80%，就出发
+                    if(((boat[i].timer_wait<=0 && boat[i].goods<boat_capacity*0.8) || 
+                        (boat[i].timer_wait<=45) && boat[i].goods<boat_capacity*0.5 && max_goods+boat[i].goods>boat_capacity*0.6)
+                        && boat[i].times_between_berth<boat[i].MAX_TIMES_BETWEEN_BERTH){
+                        boat[i].action = SHIP;
+                        berth[boat[i].berth_id].boat_id = -1;
+                        berth[boat[i].berth_id].boat_lst.erase(berth[boat[i].berth_id].boat_lst.begin());
+                        boat[i].berth_id= best_berth;
+                        berth[best_berth].boat_lst.push_back(i);
+                        boat[i].times_between_berth++;
+                        boat[i].status = 0;
+                        boat[i].timer_wait = WAIT_TIME;
+                    }
+                    else{
+                        // 如果等待时间超过了，并且达到了最大的泊位间转移次数，就出发
+                        if(boat[i].timer_wait<=0 && boat[i].times_between_berth>=boat[i].MAX_TIMES_BETWEEN_BERTH){
+                            boat[i].action = GO;
+                            boat[i].status = 0;
+                            berth[boat[i].berth_id].boat_id = -1;
+                            berth[boat[i].berth_id].boat_lst.erase(berth[boat[i].berth_id].boat_lst.begin());
+                            boat[i].berth_id= -1;
+                            boat[i].times_between_berth = 0;
+                            boat[i].timer_wait = WAIT_TIME;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 void Plan::Process()
 {
     if(fid==1){
@@ -1895,7 +2080,7 @@ void Plan::Process()
         boat[4].MAX_TIMES_BETWEEN_BERTH = 4;
     }
     RobotDo();
-    BoatDoGreedy();
+    BoatDoGreedyMore();
     BerthDo();
 }
 
