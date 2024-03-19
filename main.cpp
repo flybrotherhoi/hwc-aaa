@@ -14,7 +14,7 @@ int main()
         puts("OK");
         fflush(stdout);
     }
-    // plan.Summary();
+    plan.Summary();
 
     return 0;
 }

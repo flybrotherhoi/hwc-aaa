@@ -1,8 +1,8 @@
 #include<bits/stdc++.h>
 #include "Plan.h"
-const int MY_DEBUG=0;
-const int see_log=0;
-const int analysis = 0;
+const int MY_DEBUG = 0;
+const int see_log = 0;
+const int analysis = 1;
 vector<int> fetch_time;
 long fetch_num, send_num;
 
@@ -281,8 +281,62 @@ void Plan::Init()
     if(MY_DEBUG)cerr<<"init start"<<endl;
     // 把泊位的位置初始化到中间
     for(int i=0;i<berth_num;i++){
-        berth[i].x+=1;
-        berth[i].y+=1;
+        int sea_line[4] = {0,0,0,0};
+        // 看4条边上跟海相邻的点的个数
+        // berth[i].x+=1;
+        // berth[i].y+=1;
+        for(int j=0;j<4;j++){
+            if(berth[i].x-1 <0 || ch[berth[i].x-1][berth[i].y+j]=='*' || ch[berth[i].x-1][berth[i].y+j]=='#'){
+                sea_line[0]++;
+            }
+        }
+        for(int j=0;j<4;j++){
+            if(berth[i].y+4 >=n || ch[berth[i].x+j][berth[i].y+4]=='*' || ch[berth[i].x+j][berth[i].y+4]=='#'){
+                sea_line[1]++;
+            }
+        }
+        for(int j=0;j<4;j++){
+            if(berth[i].x+4 >=n || ch[berth[i].x+4][berth[i].y+j]=='*' || ch[berth[i].x+4][berth[i].y+j]=='#'){
+                sea_line[2]++;
+            }
+        }
+        for(int j=0;j<4;j++){
+            if(berth[i].y-1 <0 || ch[berth[i].x+j][berth[i].y-1]=='*' || ch[berth[i].x+j][berth[i].y-1]=='#'){
+                sea_line[3]++;
+            }
+        }
+        int min_=10;
+        int min_line=-1;
+        if(MY_DEBUG){
+            cerr<<"berth "<<i<<" sea line: ";
+            for(int j=0;j<4;j++){
+                cerr<<sea_line[j]<<' ';
+            }cerr<<endl;
+            cerr<<"berth "<<i<<" position: "<<berth[i].x<<","<<berth[i].y<<"--> ";
+        }
+        for(int j=0;j<4;j++){
+            if(sea_line[j]<min_){
+                min_=sea_line[j];
+                min_line=j;
+            }
+        }
+        if(min_line==0)berth[i].y+=2;
+        if(min_line==1){
+            berth[i].x+=2;
+            berth[i].y+=3;
+        }
+        if(min_line==2){
+            berth[i].x+=3;
+            berth[i].y+=1;
+        }
+        if(min_line==3)berth[i].x+=1;
+        if(MY_DEBUG)cerr<<berth[i].x<<","<<berth[i].y<<endl;
+    }
+    if(MY_DEBUG){
+        cerr<<"berth position initialized"<<endl;
+        for(int i=0;i<berth_num;i++){
+            cerr<<"<"<<berth[i].x<<','<<berth[i].y<<"> ";
+        }cerr<<endl;
     }
 
     // get the position of robots
@@ -1592,7 +1646,7 @@ void Plan::BoatDoPlain()
         if(boat[i].status==1)
         {
             if(boat[i].berth_id==-1){   // 刚送完货
-                cerr<<"boat "<<i<<" 刚送完货"<<endl;
+                //cerr<<"boat "<<i<<" 刚送完货"<<endl;
                 boat[i].action = SHIP;
                 boat[i].status=0;
                 boat[i].berth_id = i*2;
@@ -1607,7 +1661,7 @@ void Plan::BoatDoPlain()
                         || boat[i].timer_wait==0)
                 {
                     if(MY_DEBUG)cerr<<"boat to go "<<i<<"  "<<(berth[boat[i].berth_id].goods==0) << (berth[boat[i].berth_id+1].goods>boat_capacity-boat[i].goods) << (boat[i].goods>=boat_capacity*0.3)<<endl;
-                    cerr<<"boat "<<i<<" 要去它的第二个泊位"<<endl;
+                    //cerr<<"boat "<<i<<" 要去它的第二个泊位"<<endl;
                     boat[i].action = SHIP;
                     boat[i].status=0;
                     berth[boat[i].berth_id].boat_id = -1;
@@ -1620,7 +1674,7 @@ void Plan::BoatDoPlain()
                 if(berth[boat[i].berth_id].goods==0) boat[i].timer_wait--;
                 if(boat[i].timer_wait==0 || boat[i].goods>=boat_capacity*0.99){
                     if(MY_DEBUG)cerr<<"boat "<<i<<" go"<<endl;
-                    cerr<<"boat "<<i<<" 去虚拟点送货了"<<endl;
+                    //cerr<<"boat "<<i<<" 去虚拟点送货了"<<endl;
                     boat[i].action = GO;
                     boat[i].status=0;
                     berth[boat[i].berth_id].boat_id = -1;
@@ -1897,8 +1951,8 @@ void Plan::Process()
         boat[0].MAX_TIMES_BETWEEN_BERTH = 1;
         boat[1].MAX_TIMES_BETWEEN_BERTH = 1;
         boat[2].MAX_TIMES_BETWEEN_BERTH = 1;
-        boat[3].MAX_TIMES_BETWEEN_BERTH = 2;
-        boat[4].MAX_TIMES_BETWEEN_BERTH = 2;
+        boat[3].MAX_TIMES_BETWEEN_BERTH = 1;
+        boat[4].MAX_TIMES_BETWEEN_BERTH = 1;
     }
     if(fid==11000){
         boat[0].MAX_TIMES_BETWEEN_BERTH = 2;
