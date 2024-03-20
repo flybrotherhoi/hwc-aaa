@@ -2,7 +2,7 @@
 #include "Plan.h"
 const int MY_DEBUG = 0;
 const int see_log = 0;
-const int analysis = 1;
+const int analysis = 0;
 vector<int> fetch_time;
 long fetch_num, send_num;
 
@@ -13,7 +13,7 @@ const int MAX_DIST=1e5;
 int dx[4]={0,0,-1,1};
 int dy[4]={1,-1,0,0};
 const int time_between_berth=500;
-const int WAIT_TIME=50;
+int WAIT_TIME=50;
 const int MORE_WAIT=1;
 // int MAX_TIMES_BETWEEN_BERTH=1;
 bool robot_good[10];
@@ -827,6 +827,37 @@ void Plan::Output()
     }
 }
 
+void Plan::SaveLog(){
+    // output berth log
+    {
+        ofstream out;
+        if(fid==1)
+            out.open("../LinuxRelease/log/berth_log.txt",ios::out);
+        else
+            out.open("../LinuxRelease/log/berth_log.txt",ios::app);
+        for(int i=0;i<berth_num;i++){
+            out<<i<<' '<<berth[i].goods<<' '<<berth[i].boat_id<<' ';
+            if(berth[i].fetch_time.size()!=0){
+                out<<accumulate(berth[i].fetch_time.begin(),berth[i].fetch_time.end(),0.0)/berth[i].fetch_time.size()<<' ';
+            }
+            else out<<10000<<' ';
+            out<<accumulate(berth[i].goods_val_lst.begin(),berth[i].goods_val_lst.end(),0.0)<<endl;
+        }
+    }
+
+    // output boat log
+    {
+        ofstream out;
+        if(fid==1)
+            out.open("../LinuxRelease/log/boat_log.txt",ios::out);
+        else
+            out.open("../LinuxRelease/log/boat_log.txt",ios::app);
+        for(int i=0;i<5;i++){
+            out<<i<<' '<<boat[i].goods<<' '<<boat[i].berth_id<<' '<<boat[i].status<<' '<<boat[i].timer_wait<<' '<<boat[i].action<<endl;
+        }
+    }
+}
+
 void Plan::RobotDo()
 {
     int robot_not_ready=0;
@@ -894,6 +925,7 @@ void Plan::RobotDo()
                     robot[i].action_before_move=PULL;
                     berth[robot[i].berth_id].goods++;
                     berth[robot[i].berth_id].goods_val_lst.push_back(robot[i].goods_val);
+                    berth[robot[i].berth_id].fetch_time.push_back(pos_robot_path[i].size());
                     fetch_num++;
                 }
                 if(MY_DEBUG)cerr<<"planing the path for robot "<<i<<endl;
@@ -968,28 +1000,8 @@ void Plan::RobotDo()
                             temp_map[pos_robot_path[ii][jj].first][pos_robot_path[ii][jj].second]=0;
                         }
                     }
-                    if(fid>10000 && fid<10005){
-                        string fname = "../LinuxRelease/log/temp_map_"+to_string(robot[i].berth_id)+".txt";
-                        fstream out(fname,ios::out);
-                        for(int ii=0;ii<n;ii++){
-                            for(int jj=0;jj<n;jj++){
-                                out<<temp_map[ii][jj];
-                            }
-                            out<<endl;
-                        }
-                    }
                     // update shortest_dist_to_berth[i] using temp_map
                     UpdateShortestDistToBerth(temp_map, robot[i].berth_id);
-                    if(fid>10000 && fid<10005){
-                        string fname = "../LinuxRelease/log/shortest_dist_to_berth"+to_string(robot[i].berth_id)+".txt";
-                        fstream out(fname,ios::out);
-                        for(int ii=0;ii<n;ii++){
-                            for(int jj=0;jj<n;jj++){
-                                out<<setw(7) <<shortest_dist_to_berth[robot[i].berth_id][ii][jj];
-                            }
-                            out<<endl;
-                        }
-                    }
                     int gx,gy;
                     float vvt=-1;
                     for(int ii=0;ii<n;ii++){
@@ -1146,357 +1158,6 @@ void Plan::RobotDo()
                     robot[i].action_move=static_cast<RobotMove>(robot_path[i].front());
                     robot_path[i].pop_front();
                 }
-            }
-        }
-        if(MY_DEBUG)cerr<<"robot "<<i<<" action: "<<robot[i].action_before_move<<' '<<robot[i].action_move<<' '<<robot[i].action_after_move<<endl;
-    }
-}
-
-void Plan::RobotDoNow()
-{
-    int robot_not_ready=0;
-    std::set<short> robot_init_influenced_berth;
-    std::set<pair<int,int>> robot_init_influenced_pos;
-    if(fid<1000)    // 只有在前面的时间段里面才关心机器人NotReady的情况
-        for(int i=0;i<robot_num;i++){
-            if(robot_good[i]==false)continue;
-            robot_not_ready += robot[i].status==RobotStatus::NotReady;
-            if(robot[i].status==NotReady){
-                for(auto p:pos_robot_path[i]){
-                    robot_init_influenced_berth.insert(parts[p.first][p.second]);
-                    robot_init_influenced_pos.insert(p);
-                }
-            }
-        }
-    if(MY_DEBUG)cerr<<"robot not ready: "<<robot_not_ready<<endl;
-    for(int i=0;i<robot_num;i++){
-        if(robot_good[i]==false)continue;   // 是被抛弃的机器人
-        if(MY_DEBUG)cerr<<"robot "<<i<<" status: "<<robot[i].status<<endl;
-        if(robot[i].start_delay>0){
-            robot[i].status=NotReady;
-            robot[i].action_before_move=RA_NOTHING;
-            robot[i].action_move=STAND;
-            robot[i].action_after_move=RA_NOTHING;
-            robot[i].start_delay--;
-            continue;
-        }
-        if(robot[i].sys_status==0){
-            if(robot[i].action_move!=RobotMove::STAND)robot_path[i].push_front(robot[i].action_move); // 先加上恢复状态保证程序不崩溃
-            robot[i].status=RobotStatus::Collision;
-            robot[i].action_before_move=RA_NOTHING;
-            robot[i].action_move=STAND;
-            robot[i].action_after_move=RA_NOTHING;
-            cerr<<"robot "<<i<<" is in collision, its (gx,gy)= "<< robot[i].gx<<", "<<robot[i].gy<<", its position= <"<<robot[i].x<<","<<robot[i].y<<">"<<endl;
-            cerr<<"it's path is: ";
-            for(int j=0;j<pos_robot_path[i].size();j++){
-                cerr<<"("<<pos_robot_path[i][j].first<<','<<pos_robot_path[i][j].second<<") ";
-            }
-            cerr<<endl;
-            // 规划一条回泊位的路线，重新开始
-            int x=robot[i].x;
-            int y=robot[i].y;
-            int dist=shortest_dist_to_berth[robot[i].berth_id][x][y];
-            robot[i].status=ReturnToBerth;
-            short temp_map[210][210];
-            if(robot_init_influenced_pos.size()>0){
-                copy_map(map,temp_map);
-                for(auto p:robot_init_influenced_pos){
-                    temp_map[p.first][p.second]=0;
-                }
-                UpdateShortestDistToBerthAndParts(temp_map, robot[i].berth_id);
-            }
-            else{
-                copy_map(map,temp_map);
-            }
-            robot[i].gx = berth[robot[i].berth_id].x;
-            robot[i].gy = berth[robot[i].berth_id].y;
-            robot_path[i].clear();
-            pos_robot_path[i].clear();
-            deque<pair<int,int>> q;
-            q.push_back({robot[i].x,robot[i].y});
-            pos_robot_path[i].push_back(make_pair(robot[i].x,robot[i].y));
-            while(!q.empty()){
-                auto [x,y]=q.front();
-                q.pop_front();
-                // if(x==robot[i].x&&y==robot[i].y)break;
-                for(int k=0;k<4;k++){
-                    int nx=x+dx[k];
-                    int ny=y+dy[k];
-                    if(nx>=0&&nx<n&&ny>=0&&ny<n&&temp_map[nx][ny]==1&&shortest_dist_to_berth[robot[i].berth_id][nx][ny]<shortest_dist_to_berth[robot[i].berth_id][x][y]){
-                        q.push_back({nx,ny});
-                        robot_path[i].push_back(static_cast<RobotMove>(k));
-                        pos_robot_path[i].push_back(make_pair(nx,ny));
-                        break;
-                    }
-                }
-            }
-            // robot[i].action_move=static_cast<RobotMove>(robot_path[i].front());
-            // robot_path[i].pop_front();
-            if(robot_init_influenced_pos.size()>0)UpdateShortestDistToBerthAndParts(map, robot[i].berth_id);
-            if(MY_DEBUG)cerr<<"robot "<<i<<" return path to berth: ";
-            for(auto p:robot_path[i]){
-                if(MY_DEBUG)cerr<<p<<' ';
-            }if(MY_DEBUG)cerr<<endl;
-        }
-        robot[i].action_move=STAND;
-        robot[i].action_before_move=RA_NOTHING;
-        robot[i].action_after_move=RA_NOTHING;
-        auto it = robot_init_influenced_berth.find(robot[i].berth_id);
-        if (robot[i].status==NotReady){
-            // 还没初始化完成
-            if(robot[i].x==berth[robot[i].berth_id].x && robot[i].y==berth[robot[i].berth_id].y){
-                robot[i].status=ReturnToBerth;
-                robot[i].action_move=STAND;
-                robot_path[i].clear();
-                pos_robot_path[i].clear();
-            }
-            else{
-                robot[i].action_move=static_cast<RobotMove>(robot_path[i].front());
-                robot_path[i].pop_front();
-                pos_robot_path[i].erase(pos_robot_path[i].begin());
-            }
-        }
-        // else if (robot[i].status==ReturnToBerth && it==robot_init_influenced_berth.end()){
-        else if (robot[i].status==ReturnToBerth){
-            if(robot[i].x==berth[robot[i].berth_id].x && robot[i].y==berth[robot[i].berth_id].y){
-                if(robot[i].goods==1){
-                    robot[i].action_before_move=PULL;
-                    berth[robot[i].berth_id].goods++;
-                    berth[robot[i].berth_id].goods_val_lst.push_back(robot[i].goods_val);
-                    fetch_num++;
-                }
-                if(MY_DEBUG)cerr<<"planing the path for robot "<<i<<endl;
-                // 在自己的地盘寻找目标货物
-                int dist=MAX_DIST;
-                float vvt = 0;
-                short temp_map[210][210];
-                copy_map(map,temp_map);
-                if(robot_init_influenced_pos.size()>0){
-                    for(auto p:robot_init_influenced_pos){
-                        temp_map[p.first][p.second]=0;
-                    }
-                    UpdateShortestDistToBerthAndParts(temp_map, robot[i].berth_id);
-                }
-                for(int rx=0;rx<n;rx++)
-                    for(int ry=0;ry<n;ry++){
-                        // nvvt = 5.0*((1-fid/15000)/2+0.5)*gds[x][y]/(1.0*shortest_dist_to_berth[berth_id][x][y]);
-                        if(parts[rx][ry]==robot[i].berth_id){
-                            float nvvt;
-                            nvvt = (gds[rx][ry]+1.0*shortest_dist_to_berth[robot[i].berth_id][rx][ry])/(1.0*shortest_dist_to_berth[robot[i].berth_id][rx][ry]);
-                            if(gds[rx][ry]>0 && gds_time[rx][ry]+1000>fid+shortest_dist_to_berth[robot[i].berth_id][rx][ry] && nvvt>vvt){
-                                robot[i].gx=rx;
-                                robot[i].gy=ry;
-                                dist = shortest_dist_to_berth[robot[i].berth_id][rx][ry];
-                                vvt = nvvt;
-                            }
-                        }
-                }
-                if(dist!=MAX_DIST){
-                    if(MY_DEBUG)cerr<<"robot "<<i<<" going to goods: "<<robot[i].gx<<' '<<robot[i].gy<<", dist= "<<dist<<endl;
-                    robot[i].goods_val = gds[robot[i].gx][robot[i].gy];
-                    gds[robot[i].gx][robot[i].gy]=0;
-                    robot_path[i].clear();
-                    pos_robot_path[i].clear();
-                    robot[i].status=GoingToGood;
-                    // fetch_time.push_back(dist);
-                    // plan the path for each robot
-                    deque<pair<int,int>> q;
-                    q.push_back({robot[i].gx,robot[i].gy});
-                    pos_robot_path[i].push_back(make_pair(robot[i].gx,robot[i].gy));
-                    while(!q.empty()){
-                        auto [x,y]=q.front();
-                        q.pop_front();
-                        if(x==robot[i].x&&y==robot[i].y)break;
-                        for(int k=0;k<4;k++){
-                            int nx=x+dx[k];
-                            int ny=y+dy[k];
-                            if(nx>=0&&nx<n&&ny>=0&&ny<n&&temp_map[nx][ny]==1&&
-                                shortest_dist_to_berth[robot[i].berth_id][nx][ny]<shortest_dist_to_berth[robot[i].berth_id][x][y]
-                                &&parts[nx][ny]==robot[i].berth_id)
-                            {
-                                q.push_back({nx,ny});
-                                robot_path[i].push_front(ReverseRobotMove(static_cast<RobotMove>(k)));
-                                pos_robot_path[i].push_back(make_pair(nx,ny));
-                                break;
-                            }
-                        }
-                    }
-                    robot[i].action_move=static_cast<RobotMove>(robot_path[i].front());
-                    robot_path[i].pop_front();
-                    if(robot_init_influenced_pos.size()>0)UpdateShortestDistToBerthAndParts(map, robot[i].berth_id);
-                }
-                else if(fid>400)
-                { 
-                    // 自己地盘没货了，出去找货
-                    short temp_map[210][210];
-                    copy_map(map,temp_map);
-                    for(int ii=0;ii<robot_num;ii++){
-                        if(robot_good[ii]==false || ii==i)continue;
-                        for(int jj=0;jj<pos_robot_path[ii].size();jj++){
-                            temp_map[pos_robot_path[ii][jj].first][pos_robot_path[ii][jj].second]=0;
-                        }
-                    }
-                    if(robot_init_influenced_pos.size()>0){
-                        for(auto p:robot_init_influenced_pos){
-                            temp_map[p.first][p.second]=0;
-                        }
-                    }
-                    if(fid>10000 && fid<10005){
-                        string fname = "../LinuxRelease/log/temp_map_"+to_string(robot[i].berth_id)+".txt";
-                        fstream out(fname,ios::out);
-                        for(int ii=0;ii<n;ii++){
-                            for(int jj=0;jj<n;jj++){
-                                out<<temp_map[ii][jj];
-                            }
-                            out<<endl;
-                        }
-                    }
-                    // update shortest_dist_to_berth[i] using temp_map
-                    UpdateShortestDistToBerth(temp_map, robot[i].berth_id);
-                    if(fid>10000 && fid<10005){
-                        string fname = "../LinuxRelease/log/shortest_dist_to_berth"+to_string(robot[i].berth_id)+".txt";
-                        fstream out(fname,ios::out);
-                        for(int ii=0;ii<n;ii++){
-                            for(int jj=0;jj<n;jj++){
-                                out<<setw(7) <<shortest_dist_to_berth[robot[i].berth_id][ii][jj];
-                            }
-                            out<<endl;
-                        }
-                    }
-                    int gx,gy;
-                    float vvt=-1;
-                    for(int ii=0;ii<n;ii++){
-                        for(int jj=0;jj<n;jj++){
-                            if(shortest_dist_to_berth[robot[i].berth_id][ii][jj]!=MAX_DIST && gds[ii][jj]>0 && 
-                                gds_time[ii][jj]+1000>fid+shortest_dist_to_berth[robot[i].berth_id][ii][jj] && temp_map[ii][jj]==1)
-                            {
-                                float nvvt = 1.0/(1.0*shortest_dist_to_berth[robot[i].berth_id][ii][jj]);// 找最近
-                                if(nvvt>vvt){
-                                    vvt=nvvt;
-                                    gx=ii;
-                                    gy=jj;
-                                }
-                            }
-                        }
-                    }
-                    if(vvt==-1){
-                        // 即使找最近的货物也找不到
-                        // cerr<<"i am going out because i have no goods, but i didn't find."<<endl;
-                        robot[i].action_move=STAND;
-                    }
-                    else{
-                        robot[i].gx=gx;
-                        robot[i].gy=gy;
-                        robot[i].goods_val = gds[robot[i].gx][robot[i].gy];
-                        gds[robot[i].gx][robot[i].gy]=0;
-                        robot_path[i].clear();
-                        pos_robot_path[i].clear();
-                        robot[i].status=GoingToGood;
-                        fetch_time.push_back(shortest_dist_to_berth[robot[i].berth_id][gx][gy]);
-                        deque<pair<int,int>> q;
-                        q.push_back({robot[i].gx,robot[i].gy});
-                        pos_robot_path[i].push_back(make_pair(robot[i].gx,robot[i].gy));
-                        while(!q.empty()){
-                            auto [x,y]=q.front();
-                            q.pop_front();
-                            if(x==robot[i].x&&y==robot[i].y)break;
-                            for(int k=0;k<4;k++){
-                                int nx=x+dx[k];
-                                int ny=y+dy[k];
-                                if(nx>=0&&nx<n&&ny>=0&&ny<n&&temp_map[nx][ny]==1&&
-                                    shortest_dist_to_berth[robot[i].berth_id][nx][ny]<shortest_dist_to_berth[robot[i].berth_id][x][y]){
-                                    q.push_back({nx,ny});
-                                    robot_path[i].push_front(ReverseRobotMove(static_cast<RobotMove>(k)));
-                                    pos_robot_path[i].push_back(make_pair(nx,ny));
-                                    break;
-                                }
-                            }
-                        }
-                        robot[i].action_move=static_cast<RobotMove>(robot_path[i].front());
-                        robot_path[i].pop_front();
-                        // update parts and shortest_dist_to_berth
-                        copy_map(map,temp_map);
-                        set<short> influenced_parts_set;
-                        for(auto p:pos_robot_path[i]){
-                            if(parts[p.first][p.second]!=-1 && parts[p.first][p.second]!=robot[i].berth_id){
-                                // influenced_parts.push_back(parts[p.first][p.second]);
-                                influenced_parts_set.insert(parts[p.first][p.second]);
-                            }
-                            temp_map[p.first][p.second]=0;
-                            parts[p.first][p.second]=robot[i].berth_id;
-                        }
-                        //cerr<<"influenced parts size: "<<influenced_parts_set.size()<<" at frame "<<fid<<endl;
-                        for(auto p:influenced_parts_set){
-                        //    cerr<<"influenced parts: "<<p<<endl;
-                            UpdateShortestDistToBerthAndParts(p);
-                            UpdateBerthRegion(p);
-                        }
-                        UpdateShortestDistToBerthAndParts(robot[i].berth_id);
-                        UpdateBerthRegion(robot[i].berth_id);
-                        // cerr<<"influenced parts done."<<endl;
-                        // cerr<< "i am going out, because i have no goods"<<endl;
-                    }
-                }
-            }
-            else{
-                robot[i].action_move=static_cast<RobotMove>(robot_path[i].front());
-                robot_path[i].pop_front();
-            }
-        }
-        else if (robot[i].status==GoingToGood){
-            if(robot[i].x==robot[i].gx && robot[i].y==robot[i].gy){
-                // 取到货
-                robot[i].status=ReturnToBerth;
-                if(robot[i].goods==0){
-                    robot[i].action_before_move=GET;
-                    gds[robot[i].gx][robot[i].gy]=0;
-                    gds_time[robot[i].gx][robot[i].gy]=0;
-                }
-                int dist=MAX_DIST;
-                short temp_map[210][210];
-                if(robot_init_influenced_pos.size()>0){
-                    copy_map(map,temp_map);
-                    for(auto p:robot_init_influenced_pos){
-                        temp_map[p.first][p.second]=0;
-                    }
-                    UpdateShortestDistToBerthAndParts(temp_map, robot[i].berth_id);
-                }
-                else{
-                    copy_map(map,temp_map);
-                }
-                robot[i].gx = berth[robot[i].berth_id].x;
-                robot[i].gy = berth[robot[i].berth_id].y;
-                robot_path[i].clear();
-                pos_robot_path[i].clear();
-                deque<pair<int,int>> q;
-                q.push_back({robot[i].x,robot[i].y});
-                pos_robot_path[i].push_back(make_pair(robot[i].x,robot[i].y));
-                while(!q.empty()){
-                    auto [x,y]=q.front();
-                    q.pop_front();
-                    // if(x==robot[i].x&&y==robot[i].y)break;
-                    for(int k=0;k<4;k++){
-                        int nx=x+dx[k];
-                        int ny=y+dy[k];
-                        if(nx>=0&&nx<n&&ny>=0&&ny<n&&temp_map[nx][ny]==1&&shortest_dist_to_berth[robot[i].berth_id][nx][ny]<shortest_dist_to_berth[robot[i].berth_id][x][y]){
-                            q.push_back({nx,ny});
-                            robot_path[i].push_back(static_cast<RobotMove>(k));
-                            pos_robot_path[i].push_back(make_pair(nx,ny));
-                            break;
-                        }
-                    }
-                }
-                robot[i].action_move=static_cast<RobotMove>(robot_path[i].front());
-                robot_path[i].pop_front();
-                if(robot_init_influenced_pos.size()>0)UpdateShortestDistToBerthAndParts(map, robot[i].berth_id);
-                if(MY_DEBUG)cerr<<"robot "<<i<<" return path to berth: ";
-                for(auto p:robot_path[i]){
-                    if(MY_DEBUG)cerr<<p<<' ';
-                }if(MY_DEBUG)cerr<<endl;
-            }
-            else{
-                robot[i].action_move=static_cast<RobotMove>(robot_path[i].front());
-                robot_path[i].pop_front();
             }
         }
         if(MY_DEBUG)cerr<<"robot "<<i<<" action: "<<robot[i].action_before_move<<' '<<robot[i].action_move<<' '<<robot[i].action_after_move<<endl;
@@ -1875,7 +1536,7 @@ void Plan::BerthDo()
         }
         else if(MY_DEBUG)cerr<<0<<' ';
     }
-
+    
     // cerr<< "berth goods val: ";
     // for(int i=0;i<berth_num;i++){
     //     cerr<<accumulate(berth[i].goods_val_lst.begin(),berth[i].goods_val_lst.end(),0.0)<<' ';
@@ -2056,16 +1717,160 @@ void Plan::BoatDoGreedyMore(){
     }
 }
 
+void Plan::BoatDoGreedyMoreMore(){
+        /*
+    boat_capacity: 船的最大货物容量
+    boat[i]: 第i艘船
+    boat[i].status: 船的状态，-1表示刚开始，0表示移动中，1表示在装货或刚在虚拟点完成送货, 2表示泊位外等待（目前没用到）
+    boat[i].pos: 船的位置
+    boat[i].berth_id: 船停靠或要停靠的泊位，-1为虚拟点
+    boat[i].timer_wait: 船停靠没货可装时的等待时间，最大时间为WAIT_TIME，
+                        还有一个影响等待时间的地方是BerthDo中给船装货后，目前是加上一个值，并且不超过WAIT_TIME
+    boat[i].action: 船的动作，SHIP表示停靠，GO表示离开，BA_NOTHING表示无动作
+    berth[i]: 第i个泊位, berth[i].goods表示泊位i的货物数量, berth[i].boat_id表示停靠在泊位i的船的id
+    MAX_TIMES_BETWEEN_BERTH: 最大泊位间转移次数
+    WAIT_TIME: 设定的等待时间
+
+    输入：当前泊位货物和船的状态，以及当前帧数
+    输出：保存在船的动作中（boat[i].action），在Output中会统一输出，action为ship时需要设定好berth_id
+
+    */
+    // define the action for boats
+    if(fid==1){
+        // 第一帧特殊处理，任务书里说的船一开始的状态输入无效，全在虚拟点
+        for(int i=0;i<5;i++){
+            boat[i].status=-1;
+            boat[i].pos=i;
+            boat[i].berth_id = i*2;
+            // berth[boat[i].berth_id].boat_id = i;
+            berth[boat[i].berth_id].boat_lst.push_back(i);
+            boat[i].timer_wait = WAIT_TIME;
+            boat[i].times_between_berth = 0;
+        }
+    }
+    for(int i=0;i<5;i++){
+        boat[i].action = BA_NOTHING;
+        if(boat[i].berth_id!=-1 && (15000-fid)<= berth[boat[i].berth_id].transport_time+1){
+            // at last we should all go
+            boat[i].status = 0;
+            boat[i].action = GO;
+            berth[boat[i].berth_id].boat_id = -1;
+            berth[boat[i].berth_id].boat_lst.erase(std::remove_if(berth[boat[i].berth_id].boat_lst.begin(), berth[boat[i].berth_id].boat_lst.end(), [i](int num) { return num == i; }),berth[boat[i].berth_id].boat_lst.end());
+            boat[i].berth_id = -1;
+            boat[i].times_between_berth = 0;
+            boat[i].timer_wait = WAIT_TIME;
+            continue;
+        }
+        if(boat[i].status==-1){
+            boat[i].status = 0;
+            boat[i].action = SHIP;
+        }
+        else if(boat[i].status==1){ //完成或装货状态
+            if(boat[i].berth_id==-1){   // 刚送完货
+                boat[i].goods = 0;
+                boat[i].times_between_berth = 0;
+
+                // 寻找最多货物的泊位
+                int best_berth = -1;
+                int max_goods = -1;
+                for(int ii=0;ii<berth_num;ii++){
+                    int remain_goods = berth[ii].goods;
+                    for(auto b:berth[ii].boat_lst){
+                        remain_goods -= boat_capacity-boat[b].goods;
+                    }
+                    if(remain_goods>max_goods){
+                        max_goods = remain_goods;
+                        best_berth = ii;
+                    }
+                }
+                // ------------------
+
+                // 已找到并绑定
+                if(best_berth!=-1){
+                    boat[i].berth_id = best_berth;
+                    berth[best_berth].boat_lst.push_back(i);
+                    boat[i].action = SHIP;
+                    boat[i].status = 0;
+                    boat[i].timer_wait = WAIT_TIME;
+                }
+            }
+            else{
+                // 正在装货
+                berth[boat[i].berth_id].boat_id = i;
+                if(berth[boat[i].berth_id].boat_lst[0]!=i){
+                    berth[boat[i].berth_id].boat_lst.erase(berth[boat[i].berth_id].boat_lst.begin());
+                    assert(berth[boat[i].berth_id].boat_lst[0]==i);
+                }
+                if(berth[boat[i].berth_id].goods==0) boat[i].timer_wait-=1; // 泊位没货，耐心减1,这个值可以调
+                if(boat[i].goods>=boat_capacity*0.99){  //装货量达到95%，出发
+                    boat[i].action = GO;
+                    boat[i].status = 0;
+                    berth[boat[i].berth_id].boat_id = -1;
+                    berth[boat[i].berth_id].boat_lst.erase(berth[boat[i].berth_id].boat_lst.begin());
+                    boat[i].berth_id= -1;
+                    boat[i].times_between_berth = 0;
+                    boat[i].timer_wait = WAIT_TIME;
+                }
+                else{
+                    // 没装够货，找一下当前没船停靠的最多货物的泊位
+                    int best_berth = -1;
+                    int max_goods = -1;
+                    for(int ii=0;ii<berth_num;ii++){
+                        int remain_goods = berth[ii].goods;
+                        for(auto b:berth[ii].boat_lst){
+                            remain_goods -= boat_capacity-boat[b].goods;
+                        }
+                        if(remain_goods>max_goods){
+                            max_goods = remain_goods;
+                            best_berth = ii;
+                        }
+                    }
+                    assert(best_berth!=-1);
+
+                    // 如果找到了，并且当前泊位没货，且到达目标泊位后能到装货量的80%，就出发
+                    if((boat[i].timer_wait<=0) 
+                        // || (boat[i].timer_wait<=45) && boat[i].goods<boat_capacity*0.5 && max_goods+boat[i].goods>boat_capacity*0.9)
+                        && boat[i].times_between_berth<boat[i].MAX_TIMES_BETWEEN_BERTH 
+                        && (15000-berth[best_berth].transport_time-500-30)>fid){
+                        boat[i].action = SHIP;
+                        berth[boat[i].berth_id].boat_id = -1;
+                        berth[boat[i].berth_id].boat_lst.erase(berth[boat[i].berth_id].boat_lst.begin());
+                        boat[i].berth_id= best_berth;
+                        berth[best_berth].boat_lst.push_back(i);
+                        boat[i].times_between_berth++;
+                        boat[i].status = 0;
+                        boat[i].timer_wait = WAIT_TIME;
+                    }
+                    else{
+                        // 如果等待时间超过了，并且达到了最大的泊位间转移次数，就出发
+                        if(boat[i].timer_wait<=0 && boat[i].times_between_berth>=boat[i].MAX_TIMES_BETWEEN_BERTH){
+                            boat[i].action = GO;
+                            boat[i].status = 0;
+                            berth[boat[i].berth_id].boat_id = -1;
+                            berth[boat[i].berth_id].boat_lst.erase(berth[boat[i].berth_id].boat_lst.begin());
+                            boat[i].berth_id= -1;
+                            boat[i].times_between_berth = 0;
+                            boat[i].timer_wait = WAIT_TIME;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 void Plan::Process()
 {
     if(fid==1){
-        boat[0].MAX_TIMES_BETWEEN_BERTH = 2;
-        boat[1].MAX_TIMES_BETWEEN_BERTH = 2;
-        boat[2].MAX_TIMES_BETWEEN_BERTH = 3;
-        boat[3].MAX_TIMES_BETWEEN_BERTH = 3;
-        boat[4].MAX_TIMES_BETWEEN_BERTH = 3;
+        WAIT_TIME = 1;
+        boat[0].MAX_TIMES_BETWEEN_BERTH = 10;
+        boat[1].MAX_TIMES_BETWEEN_BERTH = 10;
+        boat[2].MAX_TIMES_BETWEEN_BERTH = 10;
+        boat[3].MAX_TIMES_BETWEEN_BERTH = 10;
+        boat[4].MAX_TIMES_BETWEEN_BERTH = 10;
     }
-    if(fid==5000){
+    if(fid==3000){
+        WAIT_TIME = 1;
         boat[0].MAX_TIMES_BETWEEN_BERTH = 1;
         boat[1].MAX_TIMES_BETWEEN_BERTH = 1;
         boat[2].MAX_TIMES_BETWEEN_BERTH = 1;
@@ -2073,14 +1878,15 @@ void Plan::Process()
         boat[4].MAX_TIMES_BETWEEN_BERTH = 1;
     }
     if(fid==11000){
-        boat[0].MAX_TIMES_BETWEEN_BERTH = 2;
-        boat[1].MAX_TIMES_BETWEEN_BERTH = 2;
-        boat[2].MAX_TIMES_BETWEEN_BERTH = 3;
-        boat[3].MAX_TIMES_BETWEEN_BERTH = 4;
-        boat[4].MAX_TIMES_BETWEEN_BERTH = 4;
+        WAIT_TIME = 1;
+        boat[0].MAX_TIMES_BETWEEN_BERTH = 10;
+        boat[1].MAX_TIMES_BETWEEN_BERTH = 10;
+        boat[2].MAX_TIMES_BETWEEN_BERTH = 10;
+        boat[3].MAX_TIMES_BETWEEN_BERTH = 10;
+        boat[4].MAX_TIMES_BETWEEN_BERTH = 10;
     }
     RobotDo();
-    BoatDoGreedyMore();
+    BoatDoGreedyMoreMore();
     BerthDo();
 }
 

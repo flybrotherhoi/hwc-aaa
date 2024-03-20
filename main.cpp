@@ -11,10 +11,11 @@ int main()
         int id = plan.Input();
         plan.Process();
         plan.Output();
+        // plan.SaveLog();
         puts("OK");
         fflush(stdout);
     }
-    plan.Summary();
+    // plan.Summary();
 
     return 0;
 }

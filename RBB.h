@@ -44,6 +44,7 @@ public:
     std::vector<int> boat_lst;
     int robot_id;
     int goods,remain_goods;
+    std::vector<unsigned int> fetch_time;
     std::vector<int> goods_val_lst;
     Berth(){
         x = 0;
