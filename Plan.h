@@ -34,6 +34,7 @@ public:
     void Process();
     bool RoutePlan(short tmap[210][210], int id);
     void RobotDo();
+    void RobotDoNoDelay();
     void RobotDoGlobal();
     void BoatDoPlain();
     void BoatDoGreedy();
