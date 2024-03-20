@@ -11,7 +11,7 @@ int main()
         int id = plan.Input();
         plan.Process();
         plan.Output();
-        // plan.SaveLog();
+        plan.SaveLog();
         puts("OK");
         fflush(stdout);
     }

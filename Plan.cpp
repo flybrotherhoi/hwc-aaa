@@ -30,7 +30,8 @@ bool diff_pair(const pair<int, int> &a, const pair<int, int> &b) {
     return a.first != b.first || a.second != b.second;
 }
 
-void copy_map(short src[210][210], short dst[210][210]){
+template<typename T>
+void copy_map(T src[210][210], T dst[210][210]){
     for(int i=0;i<n;i++){
         for(int j=0;j<n;j++){
             dst[i][j]=src[i][j];
@@ -61,6 +62,10 @@ void Plan::UpdateShortestDistToBerth(short temp_map[210][210],int id){
             }
         }
     }
+}
+
+void ComputeShortestDist(short temp_map[210][210], int shortest_dist[210][210]){
+
 }
 
 void Plan::UpdateShortestDistToBerthAndParts(int id){
@@ -898,6 +903,70 @@ void Plan::RobotDo()
                 cerr<<"("<<pos_robot_path[i][j].first<<','<<pos_robot_path[i][j].second<<") ";
             }
             cerr<<endl;
+            if(parts[robot[i].x][robot[i].y]==robot[i].berth_id){
+                robot[i].status=ReturnToBerth;
+                robot[i].action_move=STAND;
+                robot_path[i].clear();
+                pos_robot_path[i].clear();
+                int dist=MAX_DIST;
+                robot[i].gx = berth[robot[i].berth_id].x;
+                robot[i].gy = berth[robot[i].berth_id].y;
+                robot_path[i].clear();
+                pos_robot_path[i].clear();
+                deque<pair<int,int>> q;
+                q.push_back({robot[i].x,robot[i].y});
+                pos_robot_path[i].push_back(make_pair(robot[i].x,robot[i].y));
+                while(!q.empty()){
+                    auto [x,y]=q.front();
+                    q.pop_front();
+                    // if(x==robot[i].x&&y==robot[i].y)break;
+                    for(int k=0;k<4;k++){
+                        int nx=x+dx[k];
+                        int ny=y+dy[k];
+                        if(nx>=0&&nx<n&&ny>=0&&ny<n&&map[nx][ny]==1&&shortest_dist_to_berth[robot[i].berth_id][nx][ny]<shortest_dist_to_berth[robot[i].berth_id][x][y]){
+                            q.push_back({nx,ny});
+                            robot_path[i].push_back(static_cast<RobotMove>(k));
+                            pos_robot_path[i].push_back(make_pair(nx,ny));
+                            break;
+                        }
+                    }
+                }
+            }
+            else{
+                short temp_map[210][210];
+                copy_map(map, temp_map);
+                for(int j=0;j<10;j++){
+                    for(auto p:pos_robot_path[j]){
+                        temp_map[p.first][p.second]=0;
+                    }
+                } 
+                UpdateShortestDistToBerth(temp_map,robot[i].berth_id);
+                
+                int dist=MAX_DIST;
+                robot[i].gx = berth[robot[i].berth_id].x;
+                robot[i].gy = berth[robot[i].berth_id].y;
+                robot_path[i].clear();
+                pos_robot_path[i].clear();
+                deque<pair<int,int>> q;
+                q.push_back({robot[i].x,robot[i].y});
+                pos_robot_path[i].push_back(make_pair(robot[i].x,robot[i].y));
+                while(!q.empty()){
+                    auto [x,y]=q.front();
+                    q.pop_front();
+                    if(x==robot[i].x&&y==robot[i].y)break;
+                    for(int k=0;k<4;k++){
+                        int nx=x+dx[k];
+                        int ny=y+dy[k];
+                        if(nx>=0&&nx<n&&ny>=0&&ny<n&&temp_map[nx][ny]==1&&shortest_dist_to_berth[robot[i].berth_id][nx][ny]<shortest_dist_to_berth[robot[i].berth_id][x][y]){
+                            q.push_back({nx,ny});
+                            robot_path[i].push_back(static_cast<RobotMove>(k));
+                            pos_robot_path[i].push_back(make_pair(nx,ny));
+                            break;
+                        }
+                    }
+                }
+                UpdateShortestDistToBerth(map,robot[i].berth_id);
+            }
             continue;
         }
         robot[i].action_move=STAND;
