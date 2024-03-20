@@ -16,6 +16,7 @@ public:
     int sys_status; // 0=restore, 1=normal;
     int berth_id;
     int start_delay;
+    bool is_out;
     RobotAction action_before_move; // 0=nothing, 1=get, 2=pull
     RobotMove action_move;    // 0=right, 1=left, 2=up, 3=down
     RobotAction action_after_move;  // 0=nothing, 1=get, 2=pull
