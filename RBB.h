@@ -7,6 +7,7 @@ enum RobotAction{GET, PULL, RA_NOTHING};
 enum RobotStatus{NotReady, ReadyToGo, GoingToGood, ReturnToBerth, Collision};
 enum RobotMove{RIGHT, LEFT, UP, DOWN, STAND};
 enum BoatAction{SHIP, GO, BA_NOTHING};
+enum BoatOrderStatus{NORMAL, TIMES_ONE_FIRST, TIMES_TWO_FIRST, TIMES_THREE_FIRST};
 
 class Robot
 {
@@ -42,7 +43,7 @@ public:
     int transport_time;
     int loading_speed;
     int boat_id;
-    std::vector<int> boat_lst;
+    std::set<int> boat_lst;
     int robot_id;
     int goods,remain_goods;
     std::vector<unsigned int> fetch_time;
@@ -61,19 +62,21 @@ public:
 class Boat
 {
 public:
-    int num, pos;
     int status;
     int goods, goods_val;
     int berth_id;
     int timer_wait;
     int times_between_berth;
     int MAX_TIMES_BETWEEN_BERTH;
+    int go_times;
+    BoatOrderStatus order_status;
+    int num, pos;
     BoatAction action;
     Boat() {
-        num = 0;
-        pos = 0;
         status = 0;
         goods = 0;
+        go_times = 0;
+        order_status = NORMAL;
     }
 };
 

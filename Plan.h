@@ -15,8 +15,8 @@ public:
     std::deque<short> robot_path[10];
     std::vector<pair<int,int>> pos_robot_path[10];
     std::vector<pair<int,int>> berth_region[10];
-    std::vector<int> outer_berth;
-    std::vector<int> inner_berth;
+    std::vector<int> need_transfer_berth;
+    int nearest_berth;
     Boat boat[10];
     char ch[210][210];
     short map[210][210];
@@ -28,7 +28,10 @@ public:
     int gds[210][210];
     int gds_time[210][210];
 
-    Plan() {}
+    Plan() {
+        for(int i=0;i<10;i++)
+            berth[i].boat_lst.clear();
+    }
     void Init();
     void InitPlanB();
     int Input();
@@ -44,11 +47,14 @@ public:
     void BoatDoGreedy();
     void BoatDoGreedyMoreMore();
     void BoatDoMinTravel();
+    void ShipIn(int boat_id, int berth_id);
+    void ShipOut(int boat_id, int berth_id);
+    void UpdateBoatStrategy();
     void BerthDo();
     void Summary();
     void UpdateShortestDistToBerth(short temp_map[210][210],int id);
     void UpdateShortestDistToBerthAndParts(short temp_map[210][210],int id);
-    void UpdateShortestDistToBerthAndParts(int id);
+    void UpdateShortestDistToBerthAndParts(int id, int default_part);
     void UpdateBerthRegion(int id);
     void SaveLog();
 };

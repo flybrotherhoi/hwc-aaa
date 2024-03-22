@@ -2,7 +2,7 @@
 #include "Plan.h"
 using namespace std;
 
-int main()
+int main(int argc, char *argv[])
 {
     Plan plan{};
     plan.Init();
