@@ -9,6 +9,7 @@ enum RobotMove{RIGHT, LEFT, UP, DOWN, STAND};
 enum BoatAction{SHIP, GO, BA_NOTHING};
 enum BoatOrderStatus{NORMAL, TIMES_ONE_FIRST, TIMES_TWO_FIRST, TIMES_THREE_FIRST};
 
+
 class Robot
 {
 public:
@@ -21,6 +22,7 @@ public:
     RobotAction action_before_move; // 0=nothing, 1=get, 2=pull
     RobotMove action_move;    // 0=right, 1=left, 2=up, 3=down
     RobotAction action_after_move;  // 0=nothing, 1=get, 2=pull
+    std::set<int> parts_can_go;
     Robot() {
         x = 0;
         y = 0;

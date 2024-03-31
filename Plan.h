@@ -13,7 +13,9 @@ public:
     Robot robot[10];
     Berth berth[10];
     std::deque<short> robot_path[10];
+    std::deque<short> robot_path_back[10];
     std::vector<pair<int,int>> pos_robot_path[10];
+    std::vector<pair<int,int>> pos_robot_path_back[10];
     std::vector<pair<int,int>> berth_region[10];
     std::vector<int> need_transfer_berth;
     int nearest_berth;
@@ -41,8 +43,11 @@ public:
     bool RoutePlan(short tmap[210][210], int id);
     void RobotDo();
     void RobotDoNoDelay();
+    void RobotDoNoDelayFixedParts();
+    void RobotDoNoDelayFixedPartsGlobal();
     void RobotDoGlobal();
     void RobotDoNoDelayFlush();
+
     void BoatDoPlain();
     void BoatDoGreedy();
     void BoatDoGreedyMoreMore();
