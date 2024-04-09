@@ -2,21 +2,16 @@
 #include "Plan.h"
 using namespace std;
 
-
 int main(int argc, char *argv[])
 {
-    Plan plan{};
+    Plan plan;
     plan.Init();
-    for(int zhen = 1; zhen <= 15000; zhen ++)
+    while(scanf("%d", &plan.frame_id) != EOF)
     {
-        int id = plan.Input();
+        plan.Input();
         plan.Process();
-        plan.Output();
-        plan.SaveLog();
         puts("OK");
         fflush(stdout);
     }
-    // plan.Summary();
-
     return 0;
 }
