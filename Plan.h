@@ -38,6 +38,7 @@ public:
     void BerthDo();
 
     void RobotRoutePlan(int rid, Position target);
+    bool RobotRoutePlanForCollision(int rid, Position target);
     void BoatRoutePlan(int bid,  Position target);
 
     void RobotFindGoods(int rid);

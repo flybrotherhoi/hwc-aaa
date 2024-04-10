@@ -29,7 +29,7 @@ class Robot
 {
 public:
     int id, goods_num, goods_val; 
-    RobotStatus status;     // -1=not ready; 0=idle; 1=going to goods; 2=return to berth
+    RobotStatus status, last_status;     // -1=not ready; 0=idle; 1=going to goods; 2=return to berth
     int sys_status; // 0=restore, 1=normal;
     int berth_id;
     Position pos, last_pos;
@@ -60,12 +60,17 @@ public:
         return 4;
     };
     void MoveNormal(){
+        // if(pos==last_pos){
+        //     // if(MY_DEBUG) cerr<<"Robot "<<id<<" is blocked at "<<pos.first<<","<<pos.second<<endl;
+        //     // this->last_status = this->status;
+        //     // this->status = Collision;
+        //     // p_route--;
+        //     // return;
+        // }
         if(p_route<route.size()){
             if(MY_DEBUG) cerr<<"Robot "<<id<<" move to "<<route[p_route].first<<","<<route[p_route].second<<endl;
             Position next_pos = route[p_route];
             action_move = GetRobotMove(next_pos);
-            last_pos = pos;
-            pos = next_pos;
             p_route++;
         }
     }
@@ -77,7 +82,7 @@ public:
     int id;
     int status, sys_status;
     // int x,y;
-    Position pos;
+    Position pos, last_pos;
     int dir;
     int goods_num, goods_val;
     int target_berth;
@@ -105,10 +110,13 @@ public:
     }
     void MoveNormal(){
         // ofstream fout("log_boat_pos.txt", ios::app);
+        if(pos==last_pos){
+            if(p_route>0)p_route--;    
+        }
         if(p_route<route.size() && p_route<route_move.size()){
             // fout<<pos.first<<","<<pos.second<<"   dual pos:"<<DualPos().first<<","<<DualPos().second<<endl;
             Position next_pos = route[p_route];
-            pos = next_pos;
+            last_pos = pos;
             action = static_cast<BoatAction>(route_move[p_route]);
             p_route++;
         }

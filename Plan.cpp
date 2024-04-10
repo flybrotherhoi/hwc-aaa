@@ -222,6 +222,65 @@ void Plan::RobotRoutePlan(int rid, Position target){
     }
 }
 
+bool Plan::RobotRoutePlanForCollision(int rid, Position target){
+    int temp_robot_map[N][N];
+    for(int i = 0; i < N; i ++){
+        for(int j = 0; j < N; j ++){
+            temp_robot_map[i][j] = robot_map[i][j];
+        }
+    }
+    for(int i = 0; i < robot_num; i++){
+        if(i == rid) continue;
+        if(manhattan_distance(robot[i].pos, robot[rid].pos) <= 10){
+            temp_robot_map[robot[i].pos.first][robot[i].pos.second] = 0;
+        }
+    }
+    for(int i = 0; i < rid; i ++){
+        if(robot[i].status == Collision){
+            temp_robot_map[robot[i].pos.first][robot[i].pos.second] = 0;
+            for(int j = robot[i].p_route; j < robot[i].route.size() && j<robot[i].p_route+50; j ++){
+                temp_robot_map[robot[i].route[j].first][robot[i].route[j].second] = 0;
+            }
+        }
+    }
+
+    robot[rid].route.clear();
+    robot[rid].p_route = 0;
+    queue<Position> q;
+    q.push(robot[rid].pos);
+    int vis[N][N];
+    memset(vis, 0, sizeof(vis));
+    vis[robot[rid].pos.first][robot[rid].pos.second] = 1;
+    int pre[N][N];
+    memset(pre, -1, sizeof(pre));
+    while(!q.empty()){
+        Position now = q.front();
+        q.pop();
+        if(now == target){
+            while(now != robot[rid].pos){
+                robot[rid].route.push_back(now);
+                now = make_pair(pre[now.first][now.second] / N, pre[now.first][now.second] % N);
+            }
+            reverse(robot[rid].route.begin(), robot[rid].route.end());
+            break;
+        }
+        for(int i = 0; i < 4; i ++){
+            int nx = now.first + rdx[i];
+            int ny = now.second + rdy[i];
+            if(nx < 0 || nx >= N || ny < 0 || ny >= N || vis[nx][ny] || temp_robot_map[nx][ny] == 0) continue;
+            vis[nx][ny] = 1;
+            pre[nx][ny] = now.first * N + now.second;
+            q.push(make_pair(nx, ny));
+        }
+    }
+    if(robot[rid].route[robot[rid].route.size()-1] != target){
+        robot[rid].route.clear();
+        return false;
+    }else{
+        return true;
+    }
+}
+
 void Plan::RobotFindGoods(int rid){
     robot[rid].has_target = false;
     robot[rid].has_goods = false;
@@ -296,7 +355,29 @@ void Plan::RobotFindBerth(int rid){
 }
 
 void Plan::RobotDo(){
+    // 先扫一遍有无碰撞的，如果有，重新规划路线
+    for(int i=0;i<robot_num;i++){
+        if(robot[i].last_pos==robot[i].pos && robot[i].has_target && robot[i].status!=Collision){
+            robot[i].last_status = robot[i].status;
+            robot[i].status = Collision;
+        }
+    }
+
     for(int i = 0; i < robot_num; i ++){
+        if(robot[i].status==Collision){
+            if(MY_DEBUG)cerr << "Robot " << i << " status is Collision" << endl;
+            RobotRoutePlanForCollision(i, robot[i].target);
+        }
+    }
+    for(int i=0;i<robot_num;i++){
+        if(robot[i].status==Collision && robot[i].route.size()>0){
+            robot[i].last_pos = Position(-1, -1);
+            robot[i].status = robot[i].last_status;
+        }
+    }
+
+    for(int i = 0; i < robot_num; i ++){
+        robot[i].last_pos = robot[i].pos;
         robot[i].action_move = STAND;
         robot[i].action_before_move = RA_NOTHING;
         if(robot[i].status==Ready){
@@ -313,7 +394,8 @@ void Plan::RobotDo(){
             }
         }
         else if(robot[i].status==ToGoods){
-            if(MY_DEBUG)cerr << "Robot " << i << " is moving to goods" << endl;
+            if(MY_DEBUG)cerr << "Robot " << i << " is moving to goods, target_position is "<<robot[i].target.first<<","<<robot[i].target.second << endl;
+            if(MY_DEBUG)cerr<<"Robot "<<i<<" is at "<<robot[i].pos.first<<","<<robot[i].pos.second<<endl;
             if(robot[i].pos == robot[i].target){
                 robot[i].action_before_move = GET;
                 RobotFindBerth(i);
@@ -579,24 +661,26 @@ void Plan::Process(){
     BerthDo();
     // if(MY_DEBUG)cerr<<"Berth done"<<endl;
 
-    if(money >= robot_price && robot_num <= 0){
+    if(money >= robot_price && robot_num <= 5){
+        money-=robot_price;
         printf("lbot %d %d\n", robot_purchase_point[0].first, robot_purchase_point[0].second);
         robot.push_back(Robot(robot_purchase_point[0].first, robot_purchase_point[0].second));
     }
 
-    if(money >= boat_price && boat_num <= 0){
+    if(money >= boat_price && boat_num <= 1){
+        money-=boat_price;
         printf("lboat %d %d\n", boat_purchase_point[0].first, boat_purchase_point[0].second);
         boat.push_back(Boat(boat_purchase_point[0].first, boat_purchase_point[0].second));
     }
 
     if(MY_DEBUG){
-        cerr<<"Summary"<<endl;
-        Summary();
+        // Summary();
     }
     Output();
 }
 
 void Plan::Summary(){
+    cerr<<"Summary"<<endl;
     cerr<<"Frame "<<frame_id<<endl;
     cerr<<"Money: "<<money<<endl;
     cerr<<"Robot: "<<robot_num<<endl;
