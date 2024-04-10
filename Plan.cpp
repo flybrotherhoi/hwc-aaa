@@ -563,6 +563,24 @@ bool Plan::BoatFindDelivery(int bid){
 }
 
 void Plan::BoatDo(){
+    // 先处理死锁
+    for(int i=0;i<boat_num;i++){
+        if(boat[i].last_pos==boat[i].pos && boat[i].has_target && boat[i].status!=BReady){
+            stand_times++;
+        }
+        if(stand_times>=2){
+            boat[i].last_status = boat[i].status;
+            boat[i].status = BCollision;
+        }
+    }
+
+    for(int i = 0; i < boat_num; i ++){
+        if(boat[i].status == BCollision){
+            if(MY_DEBUG)cerr << "Boat " << i << " status is Collision" << endl;
+            BoatRoutePlanForCollision(i, boat[i].target);
+        }
+    }
+
     for(int i = 0; i < boat_num; i ++){
         if(boat[i].sys_status==1){
             if(MY_DEBUG)cerr << "Boat " << i << " is in system status 1" << endl;

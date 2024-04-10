@@ -10,7 +10,7 @@ enum RobotAction{GET, PULL, RA_NOTHING};
 enum RobotStatus{Ready, ToGoods, ToBerth, Collision};
 enum RobotMove{RIGHT, LEFT, UP, DOWN, STAND};
 enum BoatAction{ROT_CLOCKWISE, ROT_ANTICLOCKWISE, SHIP, DEPT, BERTH, BOAT_NOTHING};
-enum BoatStatus{BReady, BToDelivery, BToBerth, BLoading, BDepting, BBerthing};
+enum BoatStatus{BReady, BToDelivery, BToBerth, BLoading, BDepting, BBerthing, BCollision};
 
 const int rdx[4]={0,0,-1,1};
 const int rdy[4]={1,-1,0,0};
@@ -83,6 +83,7 @@ public:
     int status, sys_status;
     // int x,y;
     Position pos, last_pos;
+    int stand_times;
     int dir;
     int goods_num, goods_val;
     int target_berth;
@@ -97,12 +98,14 @@ public:
     Boat() {
         status = BReady;
         goods_num = 0;
+        stand_times = 0;
         has_target = false;
     }
     Boat(int startX, int startY){
         pos = Position(startX, startY);
         status = BReady;
         goods_num = 0;
+        stand_times = 0;
         has_target = false;
     }
     Position DualPos(){
@@ -111,7 +114,7 @@ public:
     void MoveNormal(){
         // ofstream fout("log_boat_pos.txt", ios::app);
         if(pos==last_pos){
-            if(p_route>0)p_route--;    
+            if(p_route>0)p_route--;
         }
         if(p_route<route.size() && p_route<route_move.size()){
             // fout<<pos.first<<","<<pos.second<<"   dual pos:"<<DualPos().first<<","<<DualPos().second<<endl;
