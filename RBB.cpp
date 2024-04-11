@@ -85,7 +85,7 @@ bool check_pos_regular(int map_size, int first, int second){
     return first>=0 && first<map_size && second>=0 && second<map_size;
 }
 
-void avoid_boat(int temp_map[][200], int map_size, Position dual_pos, int dir){
+void avoid_boat_dual(int temp_map[][200], int map_size, Position dual_pos, int dir){
     Position temp_pos{-1,-1};
     for(int i=-1;i<=2;i++){
         temp_pos.first = dual_pos.first+rdx[dir]*i;
@@ -111,6 +111,33 @@ void avoid_boat(int temp_map[][200], int map_size, Position dual_pos, int dir){
             temp_pos.second = temp_pos.second+2;
             if(check_pos_regular(map_size, temp_pos)){
                 temp_map[temp_pos.first][temp_pos.second] = 0;
+            }
+        }
+    }
+}
+
+void avoid_boat(int temp_map[][200], Boat boat){
+    Position pos = boat.pos;
+    int dir = boat.dir;
+    for(int i=0;i<3;i++){
+        if(temp_map[pos.first+rdx[dir]*i][pos.second+rdy[dir]*i]==1){
+            temp_map[pos.first+rdx[dir]*i][pos.second+rdy[dir]*i]=0;
+        }
+        if(dir==0){
+            if(temp_map[pos.first+rdx[dir]*i+1][pos.second+rdy[dir]*i]==1){
+                temp_map[pos.first+rdx[dir]*i+1][pos.second+rdy[dir]*i]=0;
+            }
+        }else if(dir==1){
+            if(temp_map[pos.first+rdx[dir]*i-1][pos.second+rdy[dir]*i]==1){
+                temp_map[pos.first+rdx[dir]*i-1][pos.second+rdy[dir]*i]=0;
+            }
+        }else if(dir==2){
+            if(temp_map[pos.first+rdx[dir]*i][pos.second+rdy[dir]*i+1]==1){
+                temp_map[pos.first+rdx[dir]*i][pos.second+rdy[dir]*i+1]=0;
+            }
+        }else if(dir==3){
+            if(temp_map[pos.first+rdx[dir]*i][pos.second+rdy[dir]*i-1]==1){
+                temp_map[pos.first+rdx[dir]*i][pos.second+rdy[dir]*i-1]=0;
             }
         }
     }

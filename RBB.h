@@ -18,6 +18,9 @@ const int rdx[4]={0,0,-1,1};
 const int rdy[4]={1,-1,0,0};
 
 typedef pair<int,int> Position;
+class Robot;
+class Boat;
+class Berth;
 
 int inverse_dir(const int &dir);
 int get_boat_dir(const Position &pos, const Position &next_pos);
@@ -26,7 +29,8 @@ Position get_dual_pos(Position posCore, int dir);
 int get_boat_move(int dir, int next_dir);
 RobotMove InverseRobotMove(const RobotMove &move);
 int manhattan_distance(const Position &a, const Position &b);
-void avoid_boat(int temp_map[][200], int map_size, Position dual_pos, int dir);
+void avoid_boat_dual(int temp_map[][200], int map_size, Position dual_pos, int dir);
+void avoid_boat(int temp_map[][200], Boat boat);
 bool check_pos_regular(int map_size, Position pos);
 bool check_pos_regular(int map_size, int first, int second);
 

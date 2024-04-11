@@ -25,9 +25,12 @@ public:
     vector<Position> robot_purchase_point;
     vector<Position> boat_purchase_point;
     vector<Position> delivery_point;
+    unsigned int p_robot_purchase_point;
+    unsigned int p_boat_purchase_point;
     Plan() {}
     void Init();
     void ProcessMap();
+    void GetBoatDualMap(int temp_map[][N], int temp_map_dual[][N]);
     void Input();
     void Output();
 
@@ -53,6 +56,8 @@ public:
     
     void Summary();
     void SaveLog();
+
+    int BoatInMainRoad(int bid);
 };
 
 #endif

@@ -12,6 +12,8 @@ void Plan::Init(){
     boat_num = 0;
     boat_capacity = 0;
     frame_id = -1;
+    p_boat_purchase_point = 0;
+    p_robot_purchase_point = 0;
     for(int i=0;i<N;i++){
         for(int j=0;j<N;j++){
             gds_time[i][j] = -1;
@@ -135,6 +137,19 @@ void Plan::ProcessMap()
     //     out << endl;
     // }
     
+}
+
+void Plan::GetBoatDualMap(int temp_map[][N], int temp_map_dual[][N]){
+    for(int i=0;i<N-1;i++){
+        for(int j=0;j<N-1;j++){
+            if(temp_map[i][j]>0 && temp_map[i+1][j]>0 && temp_map[i][j+1]>0 && temp_map[i+1][j+1]>0){
+                temp_map_dual[i][j]=1;
+            }
+            else{
+                temp_map_dual[i][j]=0;
+            }
+        }
+    }
 }
 
 void Plan::Input(){
@@ -511,21 +526,25 @@ void Plan::BoatRoutePlan(int bid, Position target){
 }
 
 bool Plan::BoatRoutePlanForCollision(int bid, Position target){
-    int temp_boat_map_dual[N][N];
+    int temp_boat_map[N][N],temp_boat_map_dual[N][N];
+
     for(int i = 0; i < N; i ++){
         for(int j = 0; j < N; j ++){
-            temp_boat_map_dual[i][j] = boat_map_dual[i][j];
+            temp_boat_map[i][j] = boat_map[i][j];
         }
     }
     for(int i = 0; i < boat_num; i++){
         if(i == bid) continue;
         Position bi_dual_pos = boat[i].DualPos();
-        if(manhattan_distance(bi_dual_pos, boat[bid].DualPos()) <= 7 && boat_map_dual[bi_dual_pos.first][bi_dual_pos.second] == 1){
+        if(manhattan_distance(bi_dual_pos, boat[bid].DualPos()) <= 7 && boat_map_dual[bi_dual_pos.first][bi_dual_pos.second] == 1 && BoatInMainRoad(i)!=6){
             // 这里要把船所占的点位全部置0
             if(BOAT_DEBUG)cerr << "Boat " << bid << " is trying to avoid " << i << endl;
-            avoid_boat(temp_boat_map_dual, N, bi_dual_pos, boat[i].dir);
+            avoid_boat(temp_boat_map, boat[i]);
         }
     }
+
+    GetBoatDualMap(temp_boat_map, temp_boat_map_dual);
+
     for(int i = 0; i < bid; i ++){
         if(boat[i].status == BCollision){
             Position bi_dual_pos = boat[i].DualPos();
@@ -535,7 +554,6 @@ bool Plan::BoatRoutePlanForCollision(int bid, Position target){
             }
         }
     }
-
 
     boat[bid].route.clear();
     boat[bid].route_move.clear();
@@ -603,28 +621,79 @@ bool Plan::BoatRoutePlanForCollision(int bid, Position target){
     for(auto p:boat[bid].route){
         temp_boat_map_dual[p.first][p.second] = 3;
     }
-    if(frame_id==2635 && bid==0){
-        ofstream out("temp_bmap_dual_0.txt");
-        for(int i=0;i<N;i++){
-            for(int j=0;j<N;j++){
-                if(i==boat[bid].DualPos().first && j==boat[bid].DualPos().second)
-                    out<<"#";
-                else out<<temp_boat_map_dual[i][j];
+    if(BOAT_DEBUG){
+        int test_frame_id=11873;
+        if(frame_id==test_frame_id && bid==0){
+            {
+                ofstream out("temp_bmap_dual_0.txt");
+                for(int i=0;i<N;i++){
+                    for(int j=0;j<N;j++){
+                        if(i==boat[bid].DualPos().first && j==boat[bid].DualPos().second)
+                            out<<"#";
+                        else out<<temp_boat_map_dual[i][j];
+                    }
+                    out<<endl;
+                }
             }
-            out<<endl;
+            {
+                ofstream out("temp_bmap_0.txt");
+                for(int i=0;i<N;i++){
+                    for(int j=0;j<N;j++){
+                        if(i==boat[bid].pos.first && j==boat[bid].pos.second)
+                            out<<"#";
+                        else out<<temp_boat_map[i][j];
+                    }
+                    out<<endl;
+                }
+            }
         }
-        cerr<<"Boat 0 route:"<<endl;
-        cerr<<manhattan_distance(boat[bid].route[boat[bid].route.size()-1], target)<<endl;
-    }
-    if(frame_id==2635 && bid==2){
-        ofstream out("temp_bmap_dual_2.txt");
-        for(int i=0;i<N;i++){
-            for(int j=0;j<N;j++){
-                if(i==boat[bid].DualPos().first && j==boat[bid].DualPos().second)
-                    out<<"#";
-                else out<<temp_boat_map_dual[i][j];
+        if(frame_id==test_frame_id && bid==1){
+            {
+                ofstream out("temp_bmap_dual_1.txt");
+                for(int i=0;i<N;i++){
+                    for(int j=0;j<N;j++){
+                        if(i==boat[bid].DualPos().first && j==boat[bid].DualPos().second)
+                            out<<"#";
+                        else out<<temp_boat_map_dual[i][j];
+                    }
+                    out<<endl;
+                }
             }
-            out<<endl;
+            {
+                ofstream out("temp_bmap_1.txt");
+                for(int i=0;i<N;i++){
+                    for(int j=0;j<N;j++){
+                        if(i==boat[bid].pos.first && j==boat[bid].pos.second)
+                            out<<"#";
+                        else out<<temp_boat_map[i][j];
+                    }
+                    out<<endl;
+                }
+            }
+
+        }
+        if(frame_id==test_frame_id && bid==2){
+            ofstream out("temp_bmap_dual_2.txt");
+            for(int i=0;i<N;i++){
+                for(int j=0;j<N;j++){
+                    if(i==boat[bid].DualPos().first && j==boat[bid].DualPos().second)
+                        out<<"#";
+                    else out<<temp_boat_map_dual[i][j];
+                }
+                out<<endl;
+            }
+            out.close();
+            out.open("temp_bmap_2.txt");
+            for(int i=0;i<N;i++){
+                for(int j=0;j<N;j++){
+                    if(i==boat[bid].pos.first && j==boat[bid].pos.second)
+                        out<<"#";
+                    else out<<temp_boat_map[i][j];
+                }
+                out<<endl;
+            }
+            // cerr<<"Boat 1 route:"<<endl;
+            // cerr<<manhattan_distance(boat[bid].route[boat[bid].route.size()-1], target)<<endl;
         }
     }
 
@@ -712,6 +781,34 @@ bool Plan::BoatFindDelivery(int bid){
     return false;
 }
 
+int Plan::BoatInMainRoad(int bid){
+    int res = 0;
+    int dir = boat[bid].dir;
+    for(int i=0;i<3;i++){
+        if(boat_map[boat[bid].pos.first+rdx[dir]*i][boat[bid].pos.second+rdy[dir]*i]==2){
+            res++;
+        }
+        if(boat[bid].dir==0){
+            if(boat_map[boat[bid].pos.first+rdx[dir]*i+1][boat[bid].pos.second+rdy[dir]*i]==2){
+                res++;
+            }
+        }else if(boat[bid].dir==1){
+            if(boat_map[boat[bid].pos.first+rdx[dir]*i-1][boat[bid].pos.second+rdy[dir]*i]==2){
+                res++;
+            }
+        }else if(boat[bid].dir==2){
+            if(boat_map[boat[bid].pos.first+rdx[dir]*i][boat[bid].pos.second+rdy[dir]*i+1]==2){
+                res++;
+            }
+        }else if(boat[bid].dir==3){
+            if(boat_map[boat[bid].pos.first+rdx[dir]*i][boat[bid].pos.second+rdy[dir]*i-1]==2){
+                res++;
+            }
+        }
+    }
+    return res;
+}
+
 void Plan::BoatDo(){
     // 先处理死锁
 
@@ -748,6 +845,8 @@ void Plan::BoatDo(){
             boat[i].last_pos = Position(-1, -1);
             boat[i].stand_times = 0;
             boat[i].status = boat[i].last_status;
+        }else{
+            boat[i].action = BOAT_NOTHING;
         }
     }
 
@@ -875,16 +974,18 @@ void Plan::Process(){
     BerthDo();
     // if(GENERAL_DEBUG)cerr<<"Berth done"<<endl;
 
-    if(money >= robot_price && robot_num <= 10){
+    if(money >= robot_price && robot_num < 15){
         money-=robot_price;
-        printf("lbot %d %d\n", robot_purchase_point[0].first, robot_purchase_point[0].second);
-        robot.push_back(Robot(robot_purchase_point[0].first, robot_purchase_point[0].second));
+        printf("lbot %d %d\n", robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second);
+        robot.push_back(Robot(robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second));
+        p_robot_purchase_point = (p_robot_purchase_point+1)%robot_purchase_point.size();
     }
 
-    if(money >= boat_price && boat_num <= 2){
+    if(money >= boat_price && boat_num < 3){
         money-=boat_price;
-        printf("lboat %d %d\n", boat_purchase_point[0].first, boat_purchase_point[0].second);
-        boat.push_back(Boat(boat_purchase_point[0].first, boat_purchase_point[0].second));
+        printf("lboat %d %d\n", boat_purchase_point[p_boat_purchase_point].first, boat_purchase_point[p_boat_purchase_point].second);
+        boat.push_back(Boat(boat_purchase_point[p_boat_purchase_point].first, boat_purchase_point[p_boat_purchase_point].second));
+        p_boat_purchase_point = (p_boat_purchase_point+1)%boat_purchase_point.size();
     }
 
     if(GENERAL_DEBUG){
