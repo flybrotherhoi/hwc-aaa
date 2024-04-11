@@ -5,8 +5,9 @@ using namespace std;
 #define _RBB_H_
 
 #define GENERAL_DEBUG 0
-#define BOAT_DEBUG 1
+#define BOAT_DEBUG 0
 #define ROBOT_DEBUG 0
+#define SAVE_LOG 1
 
 enum RobotAction{GET, PULL, RA_NOTHING};
 enum RobotStatus{Ready, ToGoods, ToBerth, Collision};
@@ -31,6 +32,7 @@ RobotMove InverseRobotMove(const RobotMove &move);
 int manhattan_distance(const Position &a, const Position &b);
 void avoid_boat_dual(int temp_map[][200], int map_size, Position dual_pos, int dir);
 void avoid_boat(int temp_map[][200], Boat boat);
+bool check_pos_boat_valid(int temp_map[][200], Position pos);
 bool check_pos_regular(int map_size, Position pos);
 bool check_pos_regular(int map_size, int first, int second);
 
@@ -96,6 +98,7 @@ public:
     int dir;
     int goods_num, goods_val;
     int target_berth;
+    int berth_id, delivery_id;
     BoatStatus status, last_status;
     Position target;
     bool has_target;
@@ -141,10 +144,11 @@ public:
 class Berth
 {
 public:
-    Position pos;
+    Position pos, valid_boat_pos;
     int id;
     int loading_speed;
     int boat_id;
+    int delivery_id;
     std::set<int> boat_lst;
     int goods_num, goods_val, remain_goods;
     std::vector<unsigned int> fetch_time;

@@ -13,5 +13,6 @@ int main(int argc, char *argv[])
         puts("OK");
         fflush(stdout);
     }
+    if(SAVE_LOG)plan.SaveLog();
     return 0;
 }

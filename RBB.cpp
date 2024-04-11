@@ -142,3 +142,14 @@ void avoid_boat(int temp_map[][200], Boat boat){
         }
     }
 }
+
+bool check_pos_boat_valid(int temp_map[][200], Position pos){
+    int x = pos.first;
+    int y = pos.second;
+    for(int i=0;i<4;i++){
+        if(temp_map[x+rdx[i]][y+rdy[i]]==0){
+            return false;
+        }
+    }
+    return true;
+}

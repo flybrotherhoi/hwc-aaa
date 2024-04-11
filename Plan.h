@@ -13,6 +13,7 @@ class Plan
 public:
     int money, berth_num, goods_num, robot_num, boat_num, boat_capacity;
     int frame_id;
+    int p_delivery_point;
     char grid[N+10][N+10];
     int robot_map[N][N];
     int boat_map[N][N];
@@ -25,6 +26,9 @@ public:
     vector<Position> robot_purchase_point;
     vector<Position> boat_purchase_point;
     vector<Position> delivery_point;
+    set<int> started_berth_set;
+    set<int> unstarted_berth_set;
+    vector<set<int>> delivery_berth_set;
     unsigned int p_robot_purchase_point;
     unsigned int p_boat_purchase_point;
     Plan() {}
@@ -38,6 +42,7 @@ public:
     
     void RobotDo();
     void BoatDo();
+    void BoatDoBindingBerth();
     void BerthDo();
 
     void RobotRoutePlan(int rid, Position target);
@@ -53,6 +58,8 @@ public:
 
     void ShipIn(int boat_id, int berth_id);
     void ShipOut(int boat_id, int berth_id);
+
+    void BuyBoat();
     
     void Summary();
     void SaveLog();
