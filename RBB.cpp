@@ -75,3 +75,43 @@ int get_boat_move(int dir, int next_dir){
     }
     return -1;
 }
+
+bool check_pos_regular(int map_size, Position pos){
+    return pos.first>=0 && pos.first<map_size && pos.second>=0 && pos.second<map_size;
+    // return true;
+}
+
+bool check_pos_regular(int map_size, int first, int second){
+    return first>=0 && first<map_size && second>=0 && second<map_size;
+}
+
+void avoid_boat(int temp_map[][200], int map_size, Position dual_pos, int dir){
+    Position temp_pos{-1,-1};
+    for(int i=-1;i<=2;i++){
+        temp_pos.first = dual_pos.first+rdx[dir]*i;
+        temp_pos.second = dual_pos.second+rdy[dir]*i;
+        if(check_pos_regular(map_size, temp_pos)){
+            temp_map[temp_pos.first][temp_pos.second] = 0;
+        }
+        if(dir==0 || dir==1){
+            temp_pos.first = temp_pos.first-1;
+            if(check_pos_regular(map_size, temp_pos)){
+                temp_map[temp_pos.first][temp_pos.second] = 0;
+            }
+            temp_pos.first = temp_pos.first+2;
+            if(check_pos_regular(map_size, temp_pos)){
+                temp_map[temp_pos.first][temp_pos.second] = 0;
+            }
+        }
+        else{
+            temp_pos.second = temp_pos.second-1;
+            if(check_pos_regular(map_size, temp_pos)){
+                temp_map[temp_pos.first][temp_pos.second] = 0;
+            }
+            temp_pos.second = temp_pos.second+2;
+            if(check_pos_regular(map_size, temp_pos)){
+                temp_map[temp_pos.first][temp_pos.second] = 0;
+            }
+        }
+    }
+}

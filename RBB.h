@@ -4,13 +4,15 @@ using namespace std;
 #ifndef _RBB_H_
 #define _RBB_H_
 
-#define MY_DEBUG 1
+#define GENERAL_DEBUG 0
+#define BOAT_DEBUG 0
+#define ROBOT_DEBUG 0
 
 enum RobotAction{GET, PULL, RA_NOTHING};
 enum RobotStatus{Ready, ToGoods, ToBerth, Collision};
 enum RobotMove{RIGHT, LEFT, UP, DOWN, STAND};
 enum BoatAction{ROT_CLOCKWISE, ROT_ANTICLOCKWISE, SHIP, DEPT, BERTH, BOAT_NOTHING};
-enum BoatStatus{BReady, BToDelivery, BToBerth, BLoading, BDepting, BBerthing, BCollision};
+enum BoatStatus{BReady, BToDelivery, BToBerth, BWaitingToBerth, BLoading, BDepting, BCollision};
 
 const int rdx[4]={0,0,-1,1};
 const int rdy[4]={1,-1,0,0};
@@ -24,6 +26,9 @@ Position get_dual_pos(Position posCore, int dir);
 int get_boat_move(int dir, int next_dir);
 RobotMove InverseRobotMove(const RobotMove &move);
 int manhattan_distance(const Position &a, const Position &b);
+void avoid_boat(int temp_map[][200], int map_size, Position dual_pos, int dir);
+bool check_pos_regular(int map_size, Position pos);
+bool check_pos_regular(int map_size, int first, int second);
 
 class Robot
 {
@@ -68,7 +73,7 @@ public:
         //     // return;
         // }
         if(p_route<route.size()){
-            if(MY_DEBUG) cerr<<"Robot "<<id<<" move to "<<route[p_route].first<<","<<route[p_route].second<<endl;
+            if(ROBOT_DEBUG) cerr<<"Robot "<<id<<" move to "<<route[p_route].first<<","<<route[p_route].second<<endl;
             Position next_pos = route[p_route];
             action_move = GetRobotMove(next_pos);
             p_route++;
@@ -80,14 +85,14 @@ class Boat
 {
 public:
     int id;
-    int status, sys_status;
+    int sys_status;
     // int x,y;
     Position pos, last_pos;
     int stand_times;
     int dir;
     int goods_num, goods_val;
     int target_berth;
-    BoatStatus boat_status;
+    BoatStatus status, last_status;
     Position target;
     bool has_target;
     vector<Position> route;
@@ -113,8 +118,11 @@ public:
     }
     void MoveNormal(){
         // ofstream fout("log_boat_pos.txt", ios::app);
-        if(pos==last_pos){
+        if(pos==last_pos && pos!=target){
             if(p_route>0)p_route--;
+        }
+        else{
+            stand_times = 0;
         }
         if(p_route<route.size() && p_route<route_move.size()){
             // fout<<pos.first<<","<<pos.second<<"   dual pos:"<<DualPos().first<<","<<DualPos().second<<endl;
