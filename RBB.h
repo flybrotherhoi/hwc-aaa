@@ -104,6 +104,7 @@ public:
     bool has_target;
     vector<Position> route;
     vector<int> route_move;
+    set<int> visited_berth;
     unsigned int p_route;
     BoatAction action;
     // int action_move;

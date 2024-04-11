@@ -402,12 +402,18 @@ void Plan::RobotFindBerth(int rid){
                         break;
                     }
                 }
-                if(started_berth_set.find(berth_id) != started_berth_set.end()){
+                if(1){
                     robot[rid].has_target = true;
                     robot[rid].target = Position(nx, ny);
                     robot[rid].berth_id = berth_id;
                     break;
                 }
+                // if(started_berth_set.find(berth_id) != started_berth_set.end()){
+                //     robot[rid].has_target = true;
+                //     robot[rid].target = Position(nx, ny);
+                //     robot[rid].berth_id = berth_id;
+                //     break;
+                // }
             }
         }
         if(robot[rid].has_target) break;
@@ -1104,6 +1110,170 @@ void Plan::BoatDoBindingBerth(){
     for(int i=0;i<boat_num;i++)if(boat[i].sys_status==0)boat[i].last_pos = boat[i].pos;
 }
 
+void Plan::BoatDoBindingDelivery(){
+    // 先处理冲突
+    if(BOAT_DEBUG)
+        for(int i=0;i<boat_num;i++){
+            cerr<<"Boat "<<i<<" status : "<<boat[i].status<<"\t\t last status : "<< boat[i].last_status<<endl;
+            cerr<<"       position:"<<boat[i].pos.first<<","<<boat[i].pos.second<<endl;
+            cerr<<"       target  :"<<boat[i].target.first<<","<<boat[i].target.second<<endl;
+            cerr<<"       stand_times  :"<<boat[i].stand_times<<endl;
+        }
+
+    for(int i=0;i<boat_num;i++){
+        if(boat[i].last_pos==boat[i].pos && boat[i].has_target && boat[i].status!=BReady 
+            && boat[i].sys_status==0 && boat[i].status!=BCollision && boat[i].status!=BWaitingToBerth 
+            && boat[i].status!=BLoading && boat[i].status!=BDepting && boat[i].pos!=boat[i].target){
+            boat[i].stand_times++;
+        }
+        if(boat[i].stand_times==3 && boat[i].status!=BCollision){
+            boat[i].last_status = boat[i].status;
+            boat[i].status = BCollision;
+        }
+    }
+
+    for(int i = 0; i < boat_num; i ++){
+        if(boat[i].status == BCollision){
+            if(BOAT_DEBUG)cerr << "Boat " << i << " status is Collision" << endl;
+            BoatRoutePlanForCollision(i, boat[i].target);
+        }
+    }
+
+    for(int i=0;i<boat_num;i++){
+        if(boat[i].status==BCollision && boat[i].route.size()>0){
+            if(BOAT_DEBUG)cerr << "Boat " << i << " release from Collision" << endl;
+            boat[i].last_pos = Position(-1, -1);
+            boat[i].stand_times = 0;
+            boat[i].status = boat[i].last_status;
+        }else{
+            boat[i].action = BOAT_NOTHING;
+        }
+    }
+
+    for(int i = 0; i < boat_num; i ++){
+        if(boat[i].sys_status==1){
+            if(BOAT_DEBUG)cerr << "Boat " << i << " is in system status 1" << endl;
+            boat[i].action = BOAT_NOTHING;
+            continue; // 恢复状态，不做任何操作
+        }
+        if(boat[i].status == BReady && boat[i].sys_status == 0){
+            if(BOAT_DEBUG)cerr << "Boat " << i << " is ready" << endl;
+            // if(BoatFindBerth(i)){
+                boat[i].target = berth[boat[i].berth_id].valid_boat_pos;
+                boat[i].has_target = true;
+                if(BOAT_DEBUG)cerr << "Boat " << i << " find berth at " << boat[i].target.first << "," << boat[i].target.second << endl;
+                BoatRoutePlan(i, boat[i].target);
+                if(BOAT_DEBUG)cerr << "Boat " << i << " route plan done" << endl;
+                ShipIn(boat[i].berth_id, i);
+                boat[i].status = BToBerth;
+                boat[i].MoveNormal();
+            //}
+        }
+        else if(boat[i].status == BWaitingToBerth && boat[i].sys_status==0){
+            if(BOAT_DEBUG)cerr << "Boat " << i << " is waiting to berth" << endl;
+            if(berth[boat[i].berth_id].boat_id == -1){
+                boat[i].action = BERTH;
+                boat[i].status = BLoading;
+            }
+        }
+        else if(boat[i].status == BToBerth && boat[i].sys_status == 0){
+            if(BOAT_DEBUG)cerr << "Boat " << i << " is moving to berth" <<" md: "<<manhattan_distance(boat[i].pos , boat[i].target)
+                << " "<<(boat_map[boat[i].pos.first][boat[i].pos.second]=='K' || boat_map[boat[i].pos.first][boat[i].pos.second]=='B')<< endl;
+            if(boat[i].has_target==false){
+                boat[i].target = berth[boat[i].berth_id].valid_boat_pos;
+                boat[i].has_target = true;
+                BoatRoutePlan(i, boat[i].target);
+            }
+            if(manhattan_distance(boat[i].pos , boat[i].target)<=2 
+                && (grid[boat[i].pos.first][boat[i].pos.second]=='K' || grid[boat[i].pos.first][boat[i].pos.second]=='B')
+                && berth[boat[i].berth_id].boat_id == -1){
+                if(BOAT_DEBUG)cerr<<"Boat "<<i<<" is at berth"<<endl;
+                boat[i].action = BERTH;
+                boat[i].status = BLoading;
+            }else if(boat[i].pos == boat[i].target 
+                && (grid[boat[i].pos.first][boat[i].pos.second]=='K' || grid[boat[i].pos.first][boat[i].pos.second]=='B')
+                && berth[boat[i].berth_id].boat_id != -1){
+                if(BOAT_DEBUG)cerr << "Boat " << i << " is waiting to berth" << endl;
+                boat[i].action = BOAT_NOTHING;
+                boat[i].status = BWaitingToBerth;
+            }
+            else{
+                boat[i].MoveNormal();
+            }
+        }
+        else if(boat[i].status == BToDelivery && boat[i].sys_status == 0){
+            if(BOAT_DEBUG)cerr << "Boat " << i << " is moving to delivery" << endl;
+            if(boat[i].has_target==false){
+                // BoatFindDelivery(i);
+                boat[i].target = delivery_point[boat[i].delivery_id];
+                boat[i].has_target = true;
+                BoatRoutePlan(i, boat[i].target);
+            }
+            if(boat[i].pos == boat[i].target){
+                boat[i].visited_berth.clear();
+                // find a best berth
+                float max_val = -1;
+                for(auto p:delivery_berth_set[boat[i].delivery_id]){
+                    int dis = manhattan_distance(boat[i].pos, berth[p].pos);
+                    int remain_goods_num = berth[p].goods_num;
+                    for(int q:berth[p].boat_lst){
+                        remain_goods_num = max(0,remain_goods_num-(boat_capacity-boat[q].goods_num));
+                    }
+                    float val = 1.0*remain_goods_num;
+                    if(val>max_val){
+                        max_val = val;
+                        boat[i].berth_id = p;
+                    }
+                }
+
+                boat[i].target = berth[boat[i].berth_id].valid_boat_pos;
+                boat[i].has_target = true;
+                if(BOAT_DEBUG)cerr << "Boat " << i << " find berth at " << boat[i].target.first << "," << boat[i].target.second << endl;
+                BoatRoutePlan(i, boat[i].target);
+                boat[i].status = BToBerth;
+                ShipIn(boat[i].berth_id, i);
+                boat[i].MoveNormal();
+            }
+            else{
+                boat[i].MoveNormal();
+            }
+        }
+        else if(boat[i].status == BLoading && boat[i].sys_status == 2 && boat[i].goods_num>0){
+            if(BOAT_DEBUG)cerr << "Boat " << i << " is loading" << endl;
+            berth[boat[i].berth_id].boat_id = i;
+            boat[i].action = BOAT_NOTHING;
+            if(boat[i].goods_num>0 && berth[boat[i].berth_id].goods_num==0 || boat[i].goods_num>=boat_capacity-berth[boat[i].berth_id].loading_speed){
+                ShipOut(boat[i].berth_id, i);
+                boat[i].visited_berth.insert(boat[i].berth_id);
+                int min_dist = MAX_DIST;
+                int dist_n_d = manhattan_distance(berth[boat[i].berth_id].valid_boat_pos, delivery_point[boat[i].delivery_id]);
+                int next_berth_id = -1;
+                for(auto p:delivery_berth_set[boat[i].delivery_id]){
+                    int dist = manhattan_distance(berth[p].valid_boat_pos, berth[boat[i].berth_id].valid_boat_pos);
+                    int dist_p_d = manhattan_distance(berth[p].valid_boat_pos, delivery_point[boat[i].delivery_id]);
+                    if(dist<min_dist && 2*dist_p_d+dist_n_d>dist_p_d+dist && berth[p].goods_num>0 && 
+                        frame_id + dist + dist_p_d + 20<15000 && // 这里其实不准确，需要统计路径上的恢复时间
+                        boat[i].visited_berth.find(p)==boat[i].visited_berth.end()){
+                        next_berth_id = p;
+                    }
+                }
+                boat[i].action = DEPT;
+                if(next_berth_id!=-1 && boat[i].goods_num<boat_capacity*0.8){
+                    boat[i].berth_id = next_berth_id;
+                    boat[i].status = BToBerth;
+                    ShipIn(boat[i].berth_id, i);
+                }
+                else{
+                    boat[i].status = BToDelivery;
+                }
+                boat[i].has_target = false;
+            }
+        }
+    }
+    for(int i=0;i<boat_num;i++)if(boat[i].sys_status==0)boat[i].last_pos = boat[i].pos;
+}
+
+
 void Plan::BerthDo(){
     for(int i = 0; i < berth_num; i ++){
         if(berth[i].goods_num > 0 && berth[i].boat_id != -1 && boat[berth[i].boat_id].sys_status==2){
@@ -1184,12 +1354,12 @@ void Plan::Process(){
     //     }
     RobotDo();
     if(GENERAL_DEBUG)cerr<<"Robot done"<<endl;
-    BoatDoBindingBerth();
+    BoatDoBindingDelivery();
     if(GENERAL_DEBUG)cerr<<"Boat done"<<endl;
     BerthDo();
     if(GENERAL_DEBUG)cerr<<"Berth done"<<endl;
 
-    if(money >= robot_price && robot_num < 16){
+    if(money >= robot_price && robot_num < 18){
         money-=robot_price;
         printf("lbot %d %d\n", robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second);
         robot.push_back(Robot(robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second));

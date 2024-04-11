@@ -43,6 +43,7 @@ public:
     void RobotDo();
     void BoatDo();
     void BoatDoBindingBerth();
+    void BoatDoBindingDelivery();
     void BerthDo();
 
     void RobotRoutePlan(int rid, Position target);
