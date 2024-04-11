@@ -5,7 +5,7 @@ using namespace std;
 #define _RBB_H_
 
 #define GENERAL_DEBUG 0
-#define BOAT_DEBUG 0
+#define BOAT_DEBUG 1
 #define ROBOT_DEBUG 0
 
 enum RobotAction{GET, PULL, RA_NOTHING};

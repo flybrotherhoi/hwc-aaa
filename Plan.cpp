@@ -776,12 +776,17 @@ void Plan::BoatDo(){
             }
         }
         else if(boat[i].status == BToBerth && boat[i].sys_status == 0){
-            if(BOAT_DEBUG)cerr << "Boat " << i << " is moving to berth" << endl;
-            if(boat[i].pos == boat[i].target && berth[boat[i].target_berth].boat_id == -1){
+            if(BOAT_DEBUG)cerr << "Boat " << i << " is moving to berth" <<" md: "<<manhattan_distance(boat[i].pos , boat[i].target)
+                << " "<<(boat_map[boat[i].pos.first][boat[i].pos.second]=='K' || boat_map[boat[i].pos.first][boat[i].pos.second]=='B')<< endl;
+            if(manhattan_distance(boat[i].pos , boat[i].target)<=2 
+                && (grid[boat[i].pos.first][boat[i].pos.second]=='K' || grid[boat[i].pos.first][boat[i].pos.second]=='B')
+                && berth[boat[i].target_berth].boat_id == -1){
                 if(BOAT_DEBUG)cerr<<"Boat "<<i<<" is at berth"<<endl;
                 boat[i].action = BERTH;
                 boat[i].status = BLoading;
-            }else if(boat[i].pos == boat[i].target && berth[boat[i].target_berth].boat_id != -1){
+            }else if(boat[i].pos == boat[i].target 
+                && (grid[boat[i].pos.first][boat[i].pos.second]=='K' || grid[boat[i].pos.first][boat[i].pos.second]=='B')
+                && berth[boat[i].target_berth].boat_id != -1){
                 if(BOAT_DEBUG)cerr << "Boat " << i << " is waiting to berth" << endl;
                 boat[i].action = BOAT_NOTHING;
                 boat[i].status = BWaitingToBerth;
@@ -870,7 +875,7 @@ void Plan::Process(){
     BerthDo();
     // if(GENERAL_DEBUG)cerr<<"Berth done"<<endl;
 
-    if(money >= robot_price && robot_num <= 5){
+    if(money >= robot_price && robot_num <= 10){
         money-=robot_price;
         printf("lbot %d %d\n", robot_purchase_point[0].first, robot_purchase_point[0].second);
         robot.push_back(Robot(robot_purchase_point[0].first, robot_purchase_point[0].second));
