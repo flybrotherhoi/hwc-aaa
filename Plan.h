@@ -56,6 +56,7 @@ public:
     void RobotRoutePlan(int rid, Position target);
     bool RobotRoutePlanForCollision(int rid, Position target);
     void BoatRoutePlan(int bid,  Position target);
+    void BoatRoutePlanContinue(int bid, Position target);
     void BoatRoutePlanAStar(int bid,  Position target);
     void BoatRoutePlanDijkstra(int bid, Position target);
     bool BoatRoutePlanForCollision(int bid,  Position target);

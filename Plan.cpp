@@ -405,8 +405,13 @@ void Plan::RobotFindGoods(int rid){
             if(nx < 0 || nx >= N || ny < 0 || ny >= N || distance[nx][ny] <= distance[now.first][now.second]+1 || robot_map[nx][ny] <= 0) continue;
             distance[nx][ny] = min(distance[now.first][now.second] + 1, distance[nx][ny]);
             q.push(make_pair(nx, ny));
-            float val = 1.0*gds_val[nx][ny]/(distance[nx][ny]+shortest_distance_to_berth[nx][ny]);
-            if(gds_time[nx][ny] + 1000 - frame_id > distance[nx][ny] && val> max_val){
+            float val;
+            // val = 1.0*gds_val[nx][ny];
+            // val = 1.0*gds_val[nx][ny]/distance[nx][ny];
+            val = 1.0*gds_val[nx][ny]/(distance[nx][ny]+shortest_distance_to_berth[nx][ny]);
+            // val = 1.0/distance[nx][ny];
+            // val = 1.0/(distance[nx][ny]+shortest_distance_to_berth[nx][ny]);
+            if(gds_time[nx][ny] + 1000 - frame_id > distance[nx][ny] && val> max_val && gds_val[nx][ny]>0){
                 target = make_pair(nx, ny);
                 // val = gds_val[nx][ny];
                 max_val = val;
@@ -629,6 +634,69 @@ void Plan::BoatRoutePlan(int bid, Position target){
         }
     }
 }
+
+void Plan::BoatRoutePlanContinue(int bid, Position target){
+    queue<Position> q;
+    queue<int> qdir;
+    // q.push(boat[bid].DualPos());
+    qdir.push(boat[bid].dir);
+    int visDual[N][N];
+    memset(visDual, 0, sizeof(visDual));
+    Position init_dual_pos = boat[bid].DualPos();
+    Position real_start_point(init_dual_pos.first+rdx[boat[bid].dir], init_dual_pos.second+rdy[boat[bid].dir]);
+    q.push(real_start_point);
+    visDual[init_dual_pos.first][init_dual_pos.second] = 1;
+    visDual[real_start_point.first][real_start_point.second] = 1;
+    int preDual[N][N];
+    memset(preDual, -1, sizeof(preDual));
+    preDual[real_start_point.first][real_start_point.second] = init_dual_pos.first * N + init_dual_pos.second;
+    // int dir = boat[bid].dir;
+    // if(BOAT_DEBUG)cerr << "Boat " << bid << " route plan from " << boat[bid].pos.first << "," << boat[bid].pos.second << " to " << target.first << "," << target.second << endl;
+    while(!q.empty()){
+        Position now = q.front();
+        // if(BOAT_DEBUG)cerr << "Now at " << now.first << "," << now.second << endl;
+        q.pop();
+        int curr_dir = qdir.front();
+        qdir.pop();
+        Position target_dual_pos = get_dual_pos(target, curr_dir);    // 动态调整目标点，因为船只最后需要核心点到达
+        if(now == target_dual_pos){
+            while(now != init_dual_pos){
+                boat[bid].route.push_back(now);
+                now = make_pair(preDual[now.first][now.second] / N, preDual[now.first][now.second] % N);
+            }
+            reverse(boat[bid].route.begin(), boat[bid].route.end());
+            int curr_dir = boat[bid].dir;
+            // boat[bid].route_move.push_back(get_boat_move(curr_dir, get_boat_dir(boat[bid].pos, boat[bid].route[0])));
+            // curr_dir = get_boat_dir(boat[bid].pos, boat[bid].route[0]);
+            for(int i = 0; i < boat[bid].route.size()-1; i++){
+                int next_dir = get_boat_dir(boat[bid].route[i], boat[bid].route[i+1]);
+                boat[bid].route_move.push_back(get_boat_move(curr_dir, next_dir));
+                curr_dir = next_dir;
+            }
+            boat[bid].route_move.push_back(SHIP);
+            break;
+        }
+        else{
+            for(int i = curr_dir; i < curr_dir+4; i++){
+                int nx, ny, ndir;
+                nx = now.first + rdx[i%4];
+                ny = now.second + rdy[i%4];
+                int idir = inverse_dir(curr_dir);
+                ndir = i%4;
+                int frontx,fronty;
+                frontx = nx + rdx[ndir];
+                fronty = ny + rdy[ndir];
+                if(ndir==idir || nx < 0 || nx >= N-1 || ny < 0 || ny >= N-1 || frontx<0 || frontx>=N-1 ||
+                    fronty<0 || fronty>=N-1 || visDual[nx][ny] || boat_map_dual[nx][ny] <= 0) continue;
+                visDual[nx][ny] = 1;
+                preDual[nx][ny] = now.first * N + now.second;   // 这个只是个编码，应该不影响
+                q.push(Position(nx, ny));
+                qdir.push(ndir);
+            }
+        }
+    }
+}
+
 
 struct ComparePair {
     bool operator()(const pair<Position, int>& p1, const pair<Position, int>& p2) {
@@ -904,7 +972,9 @@ bool Plan::BoatRoutePlanForCollision(int bid, Position target){
         int curr_dir = qdir.front();
         qdir.pop();
         Position target_dual_pos = get_dual_pos(target, curr_dir);    // 动态调整目标点，因为船只最后需要核心点到达
+        if(BOAT_DEBUG && frame_id==2517)cerr<<"now: "<<now.first<<", "<<now.second<<endl;
         if(now == target_dual_pos){
+            if(BOAT_DEBUG && frame_id==2517)cerr<<"found target"<<endl;
             while(now != init_dual_pos){
                 boat[bid].route.push_back(now);
                 now = make_pair(preDual[now.first][now.second] / N, preDual[now.first][now.second] % N);
@@ -933,6 +1003,7 @@ bool Plan::BoatRoutePlanForCollision(int bid, Position target){
                 fronty = ny + rdy[ndir];
                 if(ndir==idir || nx < 0 || nx >= N-1 || ny < 0 || ny >= N-1 || frontx<0 || frontx>=N-1 ||
                     fronty<0 || fronty>=N-1 || visDual[nx][ny] || temp_boat_map_dual[nx][ny] <= 0) continue;
+                // if(BOAT_DEBUG && frame_id==2517)cerr<<"nx,ny = "<<nx<<","<<ny<<endl;
                 visDual[nx][ny] = 1;
                 preDual[nx][ny] = now.first * N + now.second;   // 这个只是个编码，应该不影响
                 q.push(Position(nx, ny));
@@ -1472,6 +1543,13 @@ void Plan::BoatDoBindingDelivery(){
                 boat[i].target = delivery_point[boat[i].delivery_id];
                 boat[i].has_target = true;
                 BoatRoutePlanDijkstra(i, boat[i].target);
+                Position pos_last, pos_before_last;
+                pos_last = boat[i].route[boat[i].route.size()-1];
+                pos_before_last = boat[i].route[boat[i].route.size()-2];
+                int last_dir = get_boat_dir(pos_before_last, pos_last);
+                if(boat[i].target!=get_core_pos(pos_last, last_dir)){
+                    BoatRoutePlan(i, boat[i].target);
+                }
             }
             if(boat[i].pos == boat[i].target){
                 boat[i].visited_berth.clear();
@@ -1484,9 +1562,24 @@ void Plan::BoatDoBindingDelivery(){
                         remain_goods_num = max(0,remain_goods_num-(boat_capacity-boat[q].goods_num));
                     }
                     float val = 1.0*remain_goods_num;
-                    if(val>max_val){
+                    if(val>max_val && frame_id+2*dis+30<15000){
                         max_val = val;
                         boat[i].berth_id = p;
+                    }
+                }
+                if(boat[i].berth_id==-1){
+                    float max_val = -1;
+                    for(auto p:delivery_berth_set[boat[i].delivery_id]){
+                        int dis = manhattan_distance(boat[i].pos, berth[p].pos);
+                        int remain_goods_num = berth[p].goods_num;
+                        for(int q:berth[p].boat_lst){
+                            remain_goods_num = max(0,remain_goods_num-(boat_capacity-boat[q].goods_num));
+                        }
+                        float val = 1.0*remain_goods_num;
+                        if(val>max_val){
+                            max_val = val;
+                            boat[i].berth_id = p;
+                        }
                     }
                 }
 
@@ -1506,7 +1599,7 @@ void Plan::BoatDoBindingDelivery(){
             if(BOAT_DEBUG)cerr << "Boat " << i << " is loading" << endl;
             berth[boat[i].berth_id].boat_id = i;
             boat[i].action = BOAT_NOTHING;
-            if(boat[i].goods_num>0 && berth[boat[i].berth_id].goods_num==0 || boat[i].goods_num>=boat_capacity-1){
+            if(berth[boat[i].berth_id].goods_num==0 || boat[i].goods_num>=boat_capacity-1 || frame_id+manhattan_distance(boat[i].pos, boat[i].target)+15>15000){
                 ShipOut(boat[i].berth_id, i);
                 boat[i].visited_berth.insert(boat[i].berth_id);
                 int min_dist = MAX_DIST;
@@ -1537,7 +1630,6 @@ void Plan::BoatDoBindingDelivery(){
     }
     for(int i=0;i<boat_num;i++)if(boat[i].sys_status==0)boat[i].last_pos = boat[i].pos;
 }
-
 
 void Plan::BerthDo(){
     for(int i = 0; i < berth_num; i ++){
