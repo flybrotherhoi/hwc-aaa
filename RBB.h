@@ -7,7 +7,7 @@ using namespace std;
 #define GENERAL_DEBUG 0
 #define BOAT_DEBUG 0
 #define ROBOT_DEBUG 0
-#define SAVE_LOG 1
+#define SAVE_LOG 0
 
 enum RobotAction{GET, PULL, RA_NOTHING};
 enum RobotStatus{Ready, ToGoods, ToBerth, Collision};
