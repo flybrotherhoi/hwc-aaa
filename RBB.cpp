@@ -143,9 +143,10 @@ void avoid_boat(int temp_map[][200], Boat boat){
     }
 }
 
-bool check_pos_boat_valid(int temp_map[][200], Position pos){
+bool check_pos_boat_valid(int temp_map[][200],vector<vector<char>> _grid, Position pos){
     int x = pos.first;
     int y = pos.second;
+    if(_grid[x][y]!='B') return false;
     for(int i=0;i<4;i++){
         if(temp_map[x+rdx[i]][y+rdy[i]]==0){
             return false;

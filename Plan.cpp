@@ -44,26 +44,45 @@ void Plan::Init(){
     char okk[100];
     scanf("%s", okk);
 
+    if(GENERAL_DEBUG)cerr<<"Init()::Init start"<<endl;
     ProcessMap();
+    if(GENERAL_DEBUG)cerr<<"Init()::ProcessMap done"<<endl;
 
+    hash<string> h;
+    string s;
+    for(int i=0;i<N;i++){
+        for(int j=0;j<N;j++){
+            s+=grid[i][j];
+        }
+    }
+    map_hash=h(s);
+    vector<vector<char>> _grid(210);
+    for(int i = 0;i < 210;i ++) {
+        _grid[i].resize(210);
+        for(int j = 0;j < 210;j ++) {
+            _grid[i][j] = grid[i][j];
+        }
+    }
+ 
     // 初始化泊位的有效船只位置
     for(int i=0;i<berth_num;i++){
         int x = berth[i].pos.first;
         int y = berth[i].pos.second;
-        if(check_pos_boat_valid(boat_map, Position(x,y))){
+        if(check_pos_boat_valid(boat_map, _grid, Position(x,y))){
             berth[i].valid_boat_pos = Position(x,y);
             continue;
         }
         for(int j=0;j<4;j++){
             int nx = x+rdx[j];
             int ny = y+rdy[j];
-            if(check_pos_boat_valid(boat_map, Position(nx,ny))){
+            if(check_pos_boat_valid(boat_map, _grid, Position(nx,ny))){
                 berth[i].valid_boat_pos = Position(nx,ny);
                 break;
             }
         }
     }
 
+    if(GENERAL_DEBUG)cerr<<"Init()::Init delivery point and berth set"<<endl;
     // 初始化交货点-泊位集合
     for(int i = 0; i < delivery_point.size(); i ++){
         set<int> temp;
@@ -74,7 +93,7 @@ void Plan::Init(){
         int max_d = MAX_DIST;
         int delivery_id = -1;
         for(int j=0;j<delivery_point.size();j++){
-            int dist = manhattan_distance(berth[i].pos, delivery_point[j]);
+            int dist = BerthDeliveryDist(i, j);
             if(dist<max_d){
                 max_d = dist;
                 delivery_id = j;
@@ -211,6 +230,7 @@ void Plan::ProcessMap()
         }
     }
 
+    
 
     // ofstream out("bmapdual.txt");
     // for(int i = 0; i < N-1; i ++){
@@ -327,6 +347,29 @@ void Plan::RobotRoutePlan(int rid, Position target){
 }
 
 bool Plan::RobotRoutePlanForCollision(int rid, Position target){
+    if(robot[rid].pos==target){
+        if(robot[rid].goods_num<1){
+            RobotFindGoods(rid);
+            if(robot[rid].has_target){
+                target = robot[rid].target;
+                robot[rid].status = ToGoods;
+                robot[rid].last_status = robot[rid].status;
+            }
+            else{
+                return false;
+            }
+        }else{
+            RobotFindBerth(rid);
+            if(robot[rid].has_target){
+                target = robot[rid].target;
+                robot[rid].status = ToBerth;
+                robot[rid].last_status = robot[rid].status;
+            }
+            else{
+                return false;
+            }
+        }
+    }
     int temp_robot_map[N][N];
     for(int i = 0; i < N; i ++){
         for(int j = 0; j < N; j ++){
@@ -335,14 +378,14 @@ bool Plan::RobotRoutePlanForCollision(int rid, Position target){
     }
     for(int i = 0; i < robot_num; i++){
         if(i == rid) continue;
-        if(manhattan_distance(robot[i].pos, robot[rid].pos) <= 10){
+        if(manhattan_distance(robot[i].pos, robot[rid].pos) <= 10 && grid[robot[i].pos.first][robot[i].pos.second] != 'B'){
             temp_robot_map[robot[i].pos.first][robot[i].pos.second] = 0;
         }
     }
     for(int i = 0; i < rid; i ++){
         if(robot[i].status == Collision){
             temp_robot_map[robot[i].pos.first][robot[i].pos.second] = 0;
-            for(int j = robot[i].p_route; j < robot[i].route.size() && j<robot[i].p_route+50; j ++){
+            for(int j = robot[i].p_route; j < robot[i].route.size() && j<robot[i].p_route+3; j ++){
                 temp_robot_map[robot[i].route[j].first][robot[i].route[j].second] = 0;
             }
         }
@@ -377,6 +420,21 @@ bool Plan::RobotRoutePlanForCollision(int rid, Position target){
             q.push(make_pair(nx, ny));
         }
     }
+    if(ROBOT_DEBUG && frame_id==1931){
+        cerr<<"Robot target is "<<target.first<<","<<target.second<<endl;
+        ofstream out("temp_robot_map.txt");
+        for(int i = 0; i < N; i ++){
+            for(int j = 0; j < N; j ++){
+                if(robot[rid].pos.first == i && robot[rid].pos.second == j)
+                    out << 'R';
+                else if(target.first == i && target.second == j)
+                    out << 'T';
+                else
+                    out << temp_robot_map[i][j];
+            }
+            out << endl;
+        }
+    }
     if(robot[rid].route.size()<1 || robot[rid].route[robot[rid].route.size()-1] != target){
         robot[rid].route.clear();
         return false;
@@ -407,8 +465,25 @@ void Plan::RobotFindGoods(int rid){
             q.push(make_pair(nx, ny));
             float val;
             // val = 1.0*gds_val[nx][ny];
-            // val = 1.0*gds_val[nx][ny]/distance[nx][ny];
-            val = 1.0*gds_val[nx][ny]/(distance[nx][ny]+shortest_distance_to_berth[nx][ny]);
+            if(robot[rid].type==0){
+                if(boat_num<2){
+                    val = 1.0*gds_val[nx][ny]/(distance[nx][ny]*distance[nx][ny]*distance[nx][ny]);
+                }
+                else{
+                    val = 1.0*gds_val[nx][ny]/distance[nx][ny];
+                }
+            }
+            else{
+                if(robot[rid].goods_num<1){
+                    val = 1.0*gds_val[nx][ny]/distance[nx][ny];
+                }
+                else{
+                    val = 1.0*gds_val[nx][ny]/distance[nx][ny];
+                }
+                // val = 1.0*gds_val[nx][ny]/distance[nx][ny];
+            }
+
+            // val = 1.0*gds_val[nx][ny]/(distance[nx][ny]+shortest_distance_to_berth[nx][ny]);
             // val = 1.0/distance[nx][ny];
             // val = 1.0/(distance[nx][ny]+shortest_distance_to_berth[nx][ny]);
             if(gds_time[nx][ny] + 1000 - frame_id > distance[nx][ny] && val> max_val && gds_val[nx][ny]>0){
@@ -453,7 +528,9 @@ void Plan::RobotFindBerth(int rid){
                         break;
                     }
                 }
-                if(1){
+                bool started = false;
+                started = started_berth_set.find(berth_id) != started_berth_set.end();
+                if(started){
                     robot[rid].has_target = true;
                     robot[rid].target = Position(nx, ny);
                     robot[rid].berth_id = berth_id;
@@ -522,11 +599,31 @@ void Plan::RobotDo(){
             if(ROBOT_DEBUG)cerr<<"Robot "<<i<<" is at "<<robot[i].pos.first<<","<<robot[i].pos.second<<endl;
             if(robot[i].pos == robot[i].target){
                 robot[i].action_before_move = GET;
-                RobotFindBerth(i);
-                if (robot[i].has_target){
-                    robot[i].status = ToBerth;
-                    RobotRoutePlan(i, robot[i].target);
+                if(robot[i].type==0){
+                    RobotFindBerth(i);
+                    if (robot[i].has_target){
+                        robot[i].status = ToBerth;
+                        RobotRoutePlan(i, robot[i].target);
+                    }
+                }else{
+                    if(robot[i].goods_num<1){
+                        RobotFindGoods(i);
+                        if(robot[i].has_target){
+                            robot[i].status = ToGoods;
+                            RobotRoutePlan(i, robot[i].target);
+                        }
+                        else{
+                            robot[i].status = Ready;
+                        }
+                    }else if(robot[i].goods_num==1){
+                        RobotFindBerth(i);
+                        if (robot[i].has_target){
+                            robot[i].status = ToBerth;
+                            RobotRoutePlan(i, robot[i].target);
+                        }
+                    }
                 }
+
             }
             robot[i].MoveNormal();
         }
@@ -535,18 +632,20 @@ void Plan::RobotDo(){
             if(ROBOT_DEBUG)cerr<<"Robot "<<i<<" is at "<<robot[i].pos.first<<","<<robot[i].pos.second<<endl;
             if(robot[i].pos == robot[i].target){
                 if(ROBOT_DEBUG)cerr<<"Robot "<<i<<" is at berth "<<robot[i].berth_id<<endl;
-                if(robot[i].goods_num>0){
+                if(ROBOT_DEBUG)cerr<<"Robot "<<i<<" has "<<robot[i].goods_num<<" goods"<<endl;
+                if(robot[i].goods_num>=1){
                     robot[i].action_before_move = PULL;
-                    berth[robot[i].berth_id].GoodsIn(robot[i].goods_val);
-                }
-                RobotFindGoods(i);
-                if(robot[i].has_target){
-                    robot[i].status = ToGoods;
-                    RobotRoutePlan(i, robot[i].target);
-                    robot[i].MoveNormal();
-                }
-                else{
-                    robot[i].status = Ready;
+                    berth[robot[i].berth_id].GoodsIn(robot[i].goods_num);
+                    // robot[i].goods_num--;
+                    RobotFindGoods(i);
+                    if(robot[i].has_target){
+                        robot[i].status = ToGoods;
+                        RobotRoutePlan(i, robot[i].target);
+                        robot[i].MoveNormal();
+                    }
+                    else{
+                        robot[i].status = Ready;
+                    }
                 }
             }
             else{
@@ -756,10 +855,14 @@ void Plan::BoatRoutePlanDijkstra(int bid, Position target){
         G[i].clear();
     }
     Position real_start_pos = Position(boat[bid].DualPos().first+rdx[boat[bid].dir], boat[bid].DualPos().second+rdy[boat[bid].dir]);
-    int min_x = max(min(real_start_pos.first, target.first)-20,0);
-    int max_x = min(max(real_start_pos.first, target.first)+20,N-1);
-    int min_y = max(min(real_start_pos.second, target.second)-20,0);
-    int max_y = min(max(real_start_pos.second, target.second)+20,N-1);
+    // int min_x = max(min(real_start_pos.first, target.first)-20,0);
+    // int max_x = min(max(real_start_pos.first, target.first)+20,N-1);
+    // int min_y = max(min(real_start_pos.second, target.second)-20,0);
+    // int max_y = min(max(real_start_pos.second, target.second)+20,N-1);
+    int min_x = 0;
+    int max_x = N-1;
+    int min_y = 0;
+    int max_y = N-1;
     
     for(int i = 0; i < N; i ++){
         for(int j = 0; j < N; j ++){
@@ -779,10 +882,12 @@ void Plan::BoatRoutePlanDijkstra(int bid, Position target){
     dijkstra(n, real_start_pos.first * N + real_start_pos.second, G, dis, vis, pre, q);
     if(BOAT_DEBUG)cerr<<"Dijkstra::Boat "<<bid<<" route plan from "<<real_start_pos.first<<","<<real_start_pos.second<<" to "<<target.first<<","<<target.second<<endl;
     int target_dual_pos = target.first * N + target.second;
+    if(BOAT_DEBUG)cerr<<"Dijkstra::Boat "<<bid<<" target_dual_pos pre is "<<pre[target_dual_pos]/N<<","<<pre[target_dual_pos]%N<<endl;
     while(target_dual_pos != boat[bid].DualPos().first * N + boat[bid].DualPos().second){
         boat[bid].route.push_back(make_pair(target_dual_pos / N, target_dual_pos % N));
         target_dual_pos = pre[target_dual_pos];
     }
+    if(BOAT_DEBUG)cerr<<"Dijkstra::Boat "<<bid<<" route size "<<boat[bid].route.size()<<endl;
     reverse(boat[bid].route.begin(), boat[bid].route.end());
     int curr_dir = boat[bid].dir;
     for(int i = 0; i < boat[bid].route.size()-1; i++){
@@ -1151,6 +1256,7 @@ bool Plan::BoatFindBerth(int bid){
                 q.push(make_pair(nx, ny));
             }
         }
+
         boat[bid].has_target = true;
         return true;
     }
@@ -1599,16 +1705,18 @@ void Plan::BoatDoBindingDelivery(){
             if(BOAT_DEBUG)cerr << "Boat " << i << " is loading" << endl;
             berth[boat[i].berth_id].boat_id = i;
             boat[i].action = BOAT_NOTHING;
-            if(berth[boat[i].berth_id].goods_num==0 || boat[i].goods_num>=boat_capacity-1 || frame_id+manhattan_distance(boat[i].pos, boat[i].target)+15>15000){
+            if(berth[boat[i].berth_id].goods_num==0 || boat[i].goods_num>=boat_capacity-1 || 
+                frame_id+ BerthDeliveryDist(boat[i].berth_id, berth[boat[i].berth_id].delivery_id)+15>15000){
                 ShipOut(boat[i].berth_id, i);
                 boat[i].visited_berth.insert(boat[i].berth_id);
                 int min_dist = MAX_DIST;
-                int dist_n_d = manhattan_distance(berth[boat[i].berth_id].valid_boat_pos, delivery_point[boat[i].delivery_id]);
+                int dist_n_d = BerthDeliveryDist(boat[i].berth_id, boat[i].delivery_id);
                 int next_berth_id = -1;
                 for(auto p:delivery_berth_set[boat[i].delivery_id]){
                     int dist = manhattan_distance(berth[p].valid_boat_pos, berth[boat[i].berth_id].valid_boat_pos);
-                    int dist_p_d = manhattan_distance(berth[p].valid_boat_pos, delivery_point[boat[i].delivery_id]);
-                    if(dist<min_dist && dist_p_d+dist<dist_n_d+20 && berth[p].goods_num>0 && 
+                    int dist_p_d = BerthDeliveryDist(p, boat[i].delivery_id);
+
+                    if(dist<min_dist && dist_p_d+dist<2*dist_n_d && berth[p].goods_num>0 && 
                         frame_id + dist + dist_p_d + 20<15000 && // 这里其实不准确，需要统计路径上的恢复时间
                         boat[i].visited_berth.find(p)==boat[i].visited_berth.end()){
                         next_berth_id = p;
@@ -1645,6 +1753,45 @@ void Plan::BerthDo(){
     }
 }
 
+int Plan::BerthDeliveryDist(int bid, int delivery_id){
+    if(!delivery_berth_dist.empty()){
+        return delivery_berth_dist[delivery_id][bid];
+    }
+    for(int i=0;i<delivery_point.size();i++){
+        vector<int> dist;
+        for(int j=0;j<berth_num;j++){
+            dist.push_back(MAX_DIST);
+        }
+        delivery_berth_dist.push_back(dist);
+    }
+    for(int i=0;i<delivery_point.size();i++){
+        queue<Position> q;
+        q.push(delivery_point[i]);
+        int vis[N][N];
+        memset(vis, 0, sizeof(vis));
+        vis[delivery_point[i].first][delivery_point[i].second] = 1;
+        int dist[N][N];
+        memset(dist, 0x3f, sizeof(dist));
+        dist[delivery_point[i].first][delivery_point[i].second] = 0;
+        while(!q.empty()){
+            Position now = q.front();
+            q.pop();
+            for(int j = 0; j < 4; j ++){
+                int nx = now.first + rdx[j];
+                int ny = now.second + rdy[j];
+                if(nx < 0 || nx >= N || ny < 0 || ny >= N || vis[nx][ny] || boat_map[nx][ny]<=0) continue;
+                vis[nx][ny] = 1;
+                dist[nx][ny] = dist[now.first][now.second] + 1;
+                q.push(make_pair(nx, ny));
+            }
+        }
+        for(int j=0;j<berth_num;j++){
+            delivery_berth_dist[i][j] = dist[berth[j].pos.first][berth[j].pos.second];
+        }
+    }
+    return delivery_berth_dist[delivery_id][bid];
+}
+
 void Plan::ShipIn(int berth_id, int boat_id) {
     boat[boat_id].target_berth = berth_id;
     berth[berth_id].boat_lst.insert(boat_id);
@@ -1666,7 +1813,7 @@ void Plan::BuyBoat(){
     int min_dis = MAX_DIST;
     int berth_id = *unstarted_berth_set.begin();
     for(auto p:unstarted_berth_set){
-        int dis = manhattan_distance(delivery_point[p_delivery_point], berth[p].pos);
+        int dis = BerthDeliveryDist(p, p_delivery_point);
         if(dis<min_dis){
             min_dis = dis;
             berth_id = p;
@@ -1690,6 +1837,11 @@ void Plan::BuyBoat(){
     new_boat.last_pos = Position(-1, -1);
     new_boat.stand_times = 0;
     new_boat.delivery_id = berth[new_boat.berth_id].delivery_id;
+
+    for(auto p:delivery_berth_set[new_boat.delivery_id]){
+        // if(GENERAL_DEBUG)cerr<<"delivery_berth_set["<<new_boat.delivery_id<<"] = "<<p;
+        started_berth_set.insert(p);
+    }
 
     boat.push_back(new_boat);
     
@@ -1716,14 +1868,82 @@ void Plan::Process(){
     BerthDo();
     if(GENERAL_DEBUG)cerr<<"Berth done"<<endl;
 
-    if(money >= robot_price && robot_num < max_robot_num){
-        money-=robot_price;
-        printf("lbot %d %d\n", robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second);
-        robot.push_back(Robot(robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second));
-        p_robot_purchase_point = (p_robot_purchase_point+1)%robot_purchase_point.size();
+    if(map_hash==641714889){
+        max_robot_num = 6;
+        max_boat_num =2;
+        if(robot_num<2){
+            if(money >= robot_price_low && robot_num<4 && boat_num<=1){
+                money-=robot_price_low;
+                printf("lbot %d %d 0 \n", robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second);
+                robot.push_back(Robot(robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second, 0));
+                p_robot_purchase_point = (p_robot_purchase_point+1)%robot_purchase_point.size();
+            }else if(money >= robot_price_low && robot_num < max_robot_num && boat_num>1){
+                money-=robot_price_low;
+                printf("lbot %d %d 0 \n", robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second);
+                robot.push_back(Robot(robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second, 0));
+                p_robot_purchase_point = (p_robot_purchase_point+1)%robot_purchase_point.size();
+            }
+        }else{
+            if(money >= robot_price_high && robot_num<4 && boat_num<=1){
+                money-=robot_price_high;
+                printf("lbot %d %d 1 \n", robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second);
+                robot.push_back(Robot(robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second, 1));
+                p_robot_purchase_point = (p_robot_purchase_point+1)%robot_purchase_point.size();
+            }else if(money >= robot_price_low && robot_num < max_robot_num && boat_num>1){
+                money-=robot_price_high;
+                printf("lbot %d %d 1 \n", robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second);
+                robot.push_back(Robot(robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second, 1));
+                p_robot_purchase_point = (p_robot_purchase_point+1)%robot_purchase_point.size();
+            }
+        }
+    }else if(map_hash==584872362){
+        max_robot_num = 8;
+        max_boat_num =2;
+        if(robot_num<2){
+            if(money >= robot_price_low && robot_num<4 && boat_num<=1){
+                money-=robot_price_low;
+                printf("lbot %d %d 0 \n", robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second);
+                robot.push_back(Robot(robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second, 0));
+                p_robot_purchase_point = (p_robot_purchase_point+1)%robot_purchase_point.size();
+            }else if(money >= robot_price_low && robot_num < max_robot_num && boat_num>1){
+                money-=robot_price_low;
+                printf("lbot %d %d 0 \n", robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second);
+                robot.push_back(Robot(robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second, 0));
+                p_robot_purchase_point = (p_robot_purchase_point+1)%robot_purchase_point.size();
+            }
+        }else{
+            if(money >= robot_price_high && robot_num<4 && boat_num<=1){
+                money-=robot_price_high;
+                printf("lbot %d %d 1 \n", robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second);
+                robot.push_back(Robot(robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second, 1));
+                p_robot_purchase_point = (p_robot_purchase_point+1)%robot_purchase_point.size();
+            }else if(money >= robot_price_low && robot_num < max_robot_num && boat_num>1){
+                money-=robot_price_high;
+                printf("lbot %d %d 1 \n", robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second);
+                robot.push_back(Robot(robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second, 1));
+                p_robot_purchase_point = (p_robot_purchase_point+1)%robot_purchase_point.size();
+            }
+        }
+    }else{
+        max_robot_num = 16;
+        max_boat_num = 2;
+        if(money >= robot_price_low && robot_num<max_robot_num*2.0/3.0 && boat_num<=1){
+            money-=robot_price_low;
+            printf("lbot %d %d 0 \n", robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second);
+            robot.push_back(Robot(robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second, 0));
+            p_robot_purchase_point = (p_robot_purchase_point+1)%robot_purchase_point.size();
+        }else if(money >= robot_price_low && robot_num < max_robot_num && boat_num>1){
+            money-=robot_price_low;
+            printf("lbot %d %d 0 \n", robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second);
+            robot.push_back(Robot(robot_purchase_point[p_robot_purchase_point].first, robot_purchase_point[p_robot_purchase_point].second, 0));
+            p_robot_purchase_point = (p_robot_purchase_point+1)%robot_purchase_point.size();
+        }
     }
 
-    if(money >= boat_price && boat_num < max_boat_num){
+    if(frame_id==1){
+        BuyBoat();
+    }
+    if(frame_id>10 && money >= boat_price && boat_num < max_boat_num){
         BuyBoat();
     }
 

@@ -7,7 +7,7 @@ using namespace std;
 #define GENERAL_DEBUG 0
 #define BOAT_DEBUG 0
 #define ROBOT_DEBUG 0
-#define SAVE_LOG 0
+#define SAVE_LOG 1
 
 enum RobotAction{GET, PULL, RA_NOTHING};
 enum RobotStatus{Ready, ToGoods, ToBerth, Collision};
@@ -32,7 +32,8 @@ RobotMove InverseRobotMove(const RobotMove &move);
 int manhattan_distance(const Position &a, const Position &b);
 void avoid_boat_dual(int temp_map[][200], int map_size, Position dual_pos, int dir);
 void avoid_boat(int temp_map[][200], Boat boat);
-bool check_pos_boat_valid(int temp_map[][200], Position pos);
+bool check_pos_boat_valid(int temp_map[][200], vector<vector<char>> _grid, Position pos);
+// bool check_pos_boat_valid(int temp_map[][200], Position pos);
 bool check_pos_regular(int map_size, Position pos);
 bool check_pos_regular(int map_size, int first, int second);
 
@@ -43,6 +44,7 @@ public:
     RobotStatus status, last_status;     // -1=not ready; 0=idle; 1=going to goods; 2=return to berth
     int sys_status; // 0=restore, 1=normal;
     int berth_id;
+    int type;
     Position pos, last_pos;
     Position target;
     bool has_target;
@@ -53,9 +55,10 @@ public:
     vector<Position> route;
     unsigned int p_route;
     Robot() {}
-    Robot(int startX, int startY) {
+    Robot(int startX, int startY, int _type) {
         pos = Position(startX, startY);
         last_pos = Position(-1, -1);
+        type=_type;
         status = Ready;
         has_goods = false;
         has_target = false;
@@ -168,11 +171,9 @@ public:
         goods_num = 0;
         goods_val = 0;
     }
-    void GoodsIn(int goods_val){
-        if(goods_val>0){
-            goods_num++;
-            goods_val_lst.push_back(goods_val);
-        }
+    void GoodsIn(int _goods_num){
+        goods_num+=_goods_num;
+        goods_val_lst.push_back(0);
     }
 };
 

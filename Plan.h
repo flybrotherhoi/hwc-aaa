@@ -6,7 +6,8 @@
 using namespace std;
 
 const int N = 200;
-const int robot_price=2000;
+const int robot_price_low=2000;
+const int robot_price_high=5000;
 const int boat_price=8000;
 const int default_max_robot_num=16;
 const int default_max_boat_num=2;
@@ -33,11 +34,13 @@ public:
     vector<Position> robot_purchase_point;
     vector<Position> boat_purchase_point;
     vector<Position> delivery_point;
+    vector<vector<int>> delivery_berth_dist;
     set<int> started_berth_set;
     set<int> unstarted_berth_set;
     vector<set<int>> delivery_berth_set;
     unsigned int p_robot_purchase_point;
     unsigned int p_boat_purchase_point;
+    unsigned int map_hash;
     Plan() {max_robot_num=default_max_robot_num; max_boat_num=default_max_boat_num;}
     void Init();
     void ProcessMap();
@@ -60,6 +63,7 @@ public:
     void BoatRoutePlanAStar(int bid,  Position target);
     void BoatRoutePlanDijkstra(int bid, Position target);
     bool BoatRoutePlanForCollision(int bid,  Position target);
+    int BerthDeliveryDist(int berth_id, int delivery_id);
 
     void RobotFindGoods(int rid);
     void RobotFindBerth(int rid);
